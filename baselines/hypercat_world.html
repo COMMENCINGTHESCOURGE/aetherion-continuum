@@ -264,6 +264,10 @@ function fallbackToOrbit() {
 }
 
 lockMsg.addEventListener('click', requestLock);
+setTimeout(() => {
+  lockMsg.style.display = 'none';
+  fallbackToOrbit();
+}, 2);
 document.addEventListener('click', (e) => {
   if (!usePointerLock && !orbit.enabled && e.target === document.body) {
     requestLock();
