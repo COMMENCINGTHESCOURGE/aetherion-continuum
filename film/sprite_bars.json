@@ -1,0 +1,48 @@
+{
+  "_vinculum": "9 chars : 6 anims : 12 variants : 4 phases. delete one bar, the pipeline breaks.",
+
+  "characters": {
+    "defender":    {"alpha_threshold": 20, "checker_tolerance": 15, "edge_radius": 0.8, "rdp_epsilon": 1.5, "bezier_tension": 0.7,  "bg_removal": true,  "checker_removal": true},
+    "grief":       {"alpha_threshold": 15, "checker_tolerance": 0,  "edge_radius": 1.2, "rdp_epsilon": 1.0, "bezier_tension": 0.5,  "bg_removal": true,  "checker_removal": false},
+    "mecha_v2":    {"alpha_threshold": 25, "checker_tolerance": 0,  "edge_radius": 0.6, "rdp_epsilon": 1.0, "bezier_tension": 0.85, "bg_removal": true,  "checker_removal": false},
+    "mecha_pixel": {"alpha_threshold": 10, "checker_tolerance": 15, "edge_radius": 0.5, "rdp_epsilon": 1.0, "bezier_tension": 0.9,  "bg_removal": true,  "checker_removal": true},
+    "aku":         {"alpha_threshold": 18, "checker_tolerance": 15, "edge_radius": 0.7, "rdp_epsilon": 0.8, "bezier_tension": 0.6,  "bg_removal": true,  "checker_removal": true},
+    "dim_mak":     {"alpha_threshold": 20, "checker_tolerance": 15, "edge_radius": 0.9, "rdp_epsilon": 1.2, "bezier_tension": 0.65, "bg_removal": true,  "checker_removal": true},
+    "geode":       {"alpha_threshold": 15, "checker_tolerance": 15, "edge_radius": 0.4, "rdp_epsilon": 2.0, "bezier_tension": 0.95, "bg_removal": true,  "checker_removal": true},
+    "kraken":      {"alpha_threshold": 12, "checker_tolerance": 15, "edge_radius": 1.0, "rdp_epsilon": 0.6, "bezier_tension": 0.4,  "bg_removal": true,  "checker_removal": true},
+    "void_runner": {"alpha_threshold": 20, "checker_tolerance": 0,  "edge_radius": 0.3, "rdp_epsilon": 1.5, "bezier_tension": 0.9,  "bg_removal": true,  "checker_removal": false}
+  },
+
+  "animations": {
+    "idle":   {"frame_count": 4, "cycle_time": 0.7, "easing": [0.0, 0.0, 0.25, 1.0, 0.75, 1.0, 1.0, 0.0]},
+    "walk":   {"frame_count": 4, "cycle_time": 0.5, "easing": [0.0, 0.0, 0.33, 0.0, 0.66, 1.0, 1.0, 1.0]},
+    "attack": {"frame_count": 3, "cycle_time": 0.4, "easing": [0.0, 0.0, 0.15, 0.05, 0.3, 1.0]},
+    "hit":    {"frame_count": 3, "cycle_time": 0.3, "easing": [0.0, 1.0, 0.1, 0.0, 0.9, 0.3]},
+    "jump":   {"frame_count": 4, "cycle_time": 0.6, "easing": [0.0, 0.0, 0.2, 1.0, 0.5, 0.0, 0.8, 1.0]},
+    "death":  {"frame_count": 4, "cycle_time": 1.0, "easing": [0.0, 0.0, 0.25, 0.0, 0.5, 0.1, 1.0, 0.0]}
+  },
+
+  "variants": {
+    "defender_shadow":    {"hue_target": 0.66, "hue_blend": 0.70, "sat_scale": 0.5,  "val_scale": 0.70, "opacity": 1.0},
+    "defender_crystal":   {"hue_target": 0.50, "hue_blend": 0.70, "sat_scale": 0.6,  "val_scale": 1.20, "opacity": 1.0},
+    "defender_volcanic":  {"hue_target": 0.05, "hue_blend": 0.80, "sat_scale": 1.5,  "val_scale": 1.00, "opacity": 1.0},
+    "mecha_stealth":      {"hue_target": 0.50, "hue_blend": 0.60, "sat_scale": 0.1,  "val_scale": 0.60, "opacity": 1.0},
+    "mecha_overcharge":   {"hue_target": 0.50, "hue_blend": 0.60, "sat_scale": 0.5,  "val_scale": 1.40, "opacity": 1.0},
+    "mecha_corrupted":    {"hue_target": 0.00, "hue_blend": 0.80, "sat_scale": 1.3,  "val_scale": 1.00, "opacity": 1.0, "tint": [0.2, -0.15, -0.15]},
+    "kraken_deep":        {"hue_target": 0.72, "hue_blend": 0.80, "sat_scale": 1.2,  "val_scale": 0.50, "opacity": 1.0},
+    "kraken_toxic":       {"hue_target": 0.33, "hue_blend": 0.80, "sat_scale": 1.6,  "val_scale": 1.00, "opacity": 1.0},
+    "kraken_ghost":       {"hue_target": 0.58, "hue_blend": 0.70, "sat_scale": 0.3,  "val_scale": 1.30, "opacity": 0.6},
+    "aku_void":           {"hue_target": 0.80, "hue_blend": 0.80, "sat_scale": 1.2,  "val_scale": 0.70, "opacity": 1.0},
+    "aku_nature":         {"hue_target": 0.25, "hue_blend": 0.70, "sat_scale": 1.1,  "val_scale": 0.90, "opacity": 1.0},
+    "aku_frost":          {"hue_target": 0.55, "hue_blend": 0.80, "sat_scale": 0.4,  "val_scale": 1.25, "opacity": 1.0}
+  },
+
+  "phases": {
+    "clean":  {"phase": 1, "output": "chain_refined",       "next": "bezier"},
+    "bezier": {"phase": 2, "output": "bezier_paths",        "next": "animate"},
+    "animate":{"phase": 3, "output": "animated_frames",     "next": "variant"},
+    "variant":{"phase": 4, "output": "variant_sheets",      "next": null}
+  },
+
+  "export_sizes": [64, 128, 256, 512]
+}
