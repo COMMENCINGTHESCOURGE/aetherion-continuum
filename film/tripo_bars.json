@@ -1,0 +1,56 @@
+{
+  "_vinculum": "local_preview : tripo_production. the bar between them IS the pipeline. delete it, you have either infinite preview with no export, or blind export with no preview.",
+
+  "decision_bars": {
+    "topology":   {"local_max": 16384, "tripo_min": 10000,  "route": "tripo"},
+    "texture":    {"local": "procedural", "tripo": "4k_pbr", "route": "tripo"},
+    "resolution": {"local": "infinite",  "tripo_max": 4096, "route": "local"},
+    "latency":    {"local_ms": 0,        "tripo_ms": 2500,  "route": "local"},
+    "cost":       {"local": 0,           "tripo_per": 25,   "route": "local"},
+    "rigging":    {"local": false,       "tripo": true,     "route": "tripo"},
+    "iteration":  {"local_sec": 0.016,   "tripo_sec": 45,   "route": "local"}
+  },
+
+  "cost_bars": {
+    "v1": {"credits_per_model": 10, "face_range": [10000, 100000], "texture_max": 2048, "pbr": false},
+    "v2": {"credits_per_model": 25, "face_range": [10000, 500000], "texture_max": 4096, "pbr": true}
+  },
+
+  "format_bars": {
+    "input":  {"types": ["png","jpg","webp"], "max_size_mb": 5, "encoding": "base64_data_uri"},
+    "output": {"types": ["glb","obj","fbx","usd"], "default": "glb"}
+  },
+
+  "rate_bars": {
+    "free":    {"req_per_hour": 10,  "credits_per_month": 200,  "models_per_month": 8,   "concurrent": 1},
+    "pro":     {"req_per_hour": 100, "credits_per_month": 3000, "models_per_month": 120, "concurrent": 10},
+    "max":     {"req_per_hour": 300, "credits_per_month": 25000,"models_per_month": 1000,"concurrent": 100}
+  },
+
+  "route_logic": {
+    "preview": "local",
+    "iterate": "local",
+    "final_mesh": "tripo",
+    "textured": "tripo",
+    "rigged": "tripo",
+    "variant_exploration": "local",
+    "sprite_sheet_export": "local",
+    "game_ready_glb": "tripo"
+  },
+
+  "phase5": {
+    "phase": 5,
+    "name": "tripo_export",
+    "input": "clean_png",
+    "method": "POST /api/v1/task → poll → download",
+    "output": "game_ready.glb",
+    "endpoint": "https://api.tripo3d.ai/v1/task",
+    "auth": "Bearer $TRIPO_API_KEY",
+    "poll_interval_s": 2.5,
+    "default_model": "v2",
+    "default_faces": 100000,
+    "default_texture": true,
+    "default_pbr": true,
+    "default_format": "glb"
+  }
+}
