@@ -1,0 +1,159 @@
+{
+  "_vinculum": "230 bones : 500 muscles : 60k hairs : 64kHz hearing : 25Hz purr. delete one bar, the hyperrealism collapses.",
+
+  "skeleton": {
+    "total_bones_range": [230, 250],
+    "cervical_vertebrae": 7,
+    "thoracic_vertebrae": 13,
+    "lumbar_vertebrae": 7,
+    "sacral_vertebrae": 3,
+    "caudal_vertebrae_range": [18, 23],
+    "clavicle": {"type": "floating_sliver", "length_mm": 12, "ossification": "minimal"},
+    "radius_ulna": {"fused": false, "pronation_supination_deg": 140},
+    "scapula": {"slide_range_mm": 25, "rotation_deg": 60},
+    "calcaneal_tuberosity": {"mechanical_advantage": 3.2, "lever_arm_mm": 28}
+  },
+
+  "spine": {
+    "intervertebral_disc_thickness_ratio": 0.25,
+    "ligamentum_flavum_compliance": "exceptionally_high",
+    "torsion_spring_constant_Nm_per_rad": 0.8,
+    "aerial_righting_time_s": 0.3,
+    "rotation_sequence": ["head", "forequarters", "hindquarters", "tail_counterbalance"],
+    "stride_length_increase_pct": 20,
+    "gallop_flexion_arch_angle_deg": 45
+  },
+
+  "muscle": {
+    "fast_twitch_pct": 80,
+    "fiber_type": "Type_IIx_glycolytic",
+    "mitochondrial_density": "high_for_fast_twitch",
+    "peak_power_W_per_kg": 300,
+    "takeoff_force_bodyweight_multiple": 5.5,
+    "vertical_leap_m": 1.5,
+    "takeoff_velocity_m_per_s": 5.4,
+    "tendon_elastic_energy_pct": 30,
+    "sprint_speed_km_per_h": 30,
+    "sprint_distance_m": 15,
+    "proprioceptive_correction_ms": 25
+  },
+
+  "integument": {
+    "hair_density_per_sq_inch": 60000,
+    "guard_hair_coating": "sebum_lipid_layer",
+    "undercoat_crimp": "fine_trapped_air",
+    "pilorection_control": "sympathetic_adrenergic_arrector_pili",
+    "thermal_conductance": "variable_by_erection"
+  },
+
+  "coat_genetics": {
+    "eumelanin_receptor": "MC1R_switch",
+    "pheomelanin_pathway": "MC1R_off",
+    "tabby_pattern": {
+      "mechanism": "Turing_reaction_diffusion",
+      "signal_peptide": "agouti_banding",
+      "activator_diffusion_rate": 0.03,
+      "inhibitor_diffusion_rate": 0.12
+    },
+    "calico_tortoiseshell": {
+      "mechanism": "X_inactivation_mosaicism",
+      "male_anomaly": "XXY_sterile",
+      "frequency_male": "1_in_3000"
+    },
+    "colorpoint": {
+      "mechanism": "temperature_sensitive_tyrosinase",
+      "threshold_temp_C": 34,
+      "extremity_darkening": "ears_paws_face_tail"
+    }
+  },
+
+  "vision": {
+    "corneal_radius_mm": 8.5,
+    "pupil_f_number": 1.0,
+    "pupil_type": "vertical_slit_multifocal",
+    "rod_cone_ratio": 25,
+    "rod_density_per_sq_mm": 460000,
+    "tapetum_lucidum_tiers": 17,
+    "tapetum_material": "riboflavin_zinc_cysteine_crystals",
+    "light_sensitivity_gain_pct": 45,
+    "acuity_loss_from_scatter_pct": 12.5,
+    "rod_peak_sensitivity_nm": 505,
+    "s_cone_peak_nm": 450,
+    "ml_cone_peak_nm": 553,
+    "color_vision": "dichromatic_deuteranope_equivalent",
+    "flicker_fusion_Hz": 55,
+    "binocular_overlap_deg": 130,
+    "stereopsis_accuracy_mm_at_1m": 15,
+    "horizontal_streak": true
+  },
+
+  "audition": {
+    "cochlear_turns": 3,
+    "outer_hair_cells": 10000,
+    "inner_hair_cells": 3500,
+    "max_frequency_kHz": 64,
+    "adult_range_kHz": [0.05, 60],
+    "pinna_muscles": 32,
+    "pinna_rotation_deg": 180,
+    "spectral_notch_kHz": 10,
+    "localization_accuracy_deg": 5,
+    "ita_low_freq_threshold_Hz": 1500,
+    "ild_high_freq_threshold_Hz": 3000
+  },
+
+  "olfaction": {
+    "epithelium_area_cm2": 20,
+    "receptor_neurons": 200000000,
+    "receptor_types": 1000,
+    "vno_v1r_functional_genes": 30,
+    "flehmen_pump": "vascular_mechanism",
+    "felinine_pathway": "glutathione_methionine_condensation_kidney",
+    "f3_pheromone_fraction": "cheek_rub_deposit",
+    "mmb_breakdown_product": "3_mercapto_3_methylbutan_1_ol"
+  },
+
+  "claws": {
+    "protraction_muscle": "deep_digital_flexor",
+    "retraction_ligament": "elastic_dorsal_passive",
+    "sheath_keratin_shed_cycle_days": 60,
+    "scratch_signal": "interdigital_sebaceous_eccrine_lipid_mix"
+  },
+
+  "vocalization": {
+    "purr_frequency_Hz": 25,
+    "purr_oscillator": "nucleus_ambiguous_brainstem",
+    "purr_regeneration_hypothesis": "osteoblast_stimulation_20_50Hz",
+    "meow_fundamental_Hz": [400, 1200],
+    "meow_infant_cry_mimicry_Hz": [300, 600],
+    "solicitation_purr": "meow_embedded_in_purr_harmonics",
+    "hiss_mechanism": "forced_glottal_exhalation"
+  },
+
+  "communication": {
+    "slow_blink": {"duration_ms": 400, "signal": "affiliative_trust", "response": "approach_trigger"},
+    "pupil_dilation_latency_ms": 300,
+    "tail_positions": ["vertical_confidence", "low_fear", "lashing_agitation", "wrapped_affection"],
+    "bunting": {"gland": "temporal_F3", "surface": "vertical_facial_height"},
+    "urine_spraying": {"posture": "back_to_surface_tail_quiver", "felinine_concentration_male_intact": "testosterone_dependent"}
+  },
+
+  "domestication": {
+    "ancestor": "Felis_lybica",
+    "divergence_years": 10000,
+    "selection_genes": ["memory", "fear_conditioning", "neural_crest_migration"],
+    "neural_crest_deficit_traits": ["ear_flop", "coat_change", "brain_size_reduction", "adrenal_reduction"],
+    "social_structure": "matrilineal_colony_female_philopatry",
+    "allogrooming": "tension_reduction_head_neck_licking",
+    "time_sharing": "same_space_different_hours_conflict_avoidance"
+  },
+
+  "metabolism": {
+    "diet": "obligate_carnivore",
+    "taurine": {"synthesis": "insufficient", "deficiency_heart": "dilated_cardiomyopathy", "deficiency_eye": "central_retinal_degeneration"},
+    "arginine": {"single_meal_depletion": "hyperammonemia_hours_to_fatal"},
+    "sweet_taste": {"gene": "Tas1r2_pseudogenized", "fructokinase": "absent"},
+    "vitamin_a": "preformed_animal_tissue_only_no_beta_carotene_cleavage",
+    "vitamin_d3": "dietary_only_insufficient_skin_synthesis",
+    "arachidonic_acid": "dietary_essential"
+  }
+}
