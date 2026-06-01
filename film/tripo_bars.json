@@ -51,7 +51,40 @@
     "game_ready_glb": "kaggle",
     "production_batch": "kaggle",
     "quick_test": "local",
-    "paid_quality": "tripo"
+    "paid_quality": "tripo",
+    "programmatic_gpu": "lightning",
+    "manual_colab": "colab",
+    "zero_cost_cloud": "kaggle"
+  },
+
+  "lightning_bars": {
+    "gpu": "T4",
+    "vram_gb": 16,
+    "cost_per_hour": 0.40,
+    "credits_remaining": 5.49,
+    "hours_remaining": 13.7,
+    "conversions_possible": 250,
+    "studio": "controlled-copper-5tcd",
+    "teamspace": "erdos-straus-sieve-project",
+    "sdk": "lightning_sdk — full programmatic control",
+    "switch_gpu": "s.switch_machine('t4')",
+    "startup_time_s": 45
+  },
+
+  "colab_bars": {
+    "gpu": "T4",
+    "vram_gb": 15,
+    "cost": 0,
+    "session_limit_h": 12,
+    "idle_timeout_min": 90,
+    "api": "none — browser only",
+    "automation": "manual upload → Runtime → Run all → download",
+    "notebook": "colab_hunyuan.ipynb"
+  },
+
+  "notebooklm_bars": {
+    "verdict": "UNSUITABLE",
+    "reason": "document analysis tool, cannot execute Python or GPU workloads"
   },
 
   "phase5": {
