@@ -1,14 +1,27 @@
 {
-  "_vinculum": "local_preview : tripo_production. the bar between them IS the pipeline. delete it, you have either infinite preview with no export, or blind export with no preview.",
+  "_vinculum": "local_preview : tripo_production : kaggle_zero. three paths, one bar. delete it, you have preview with no export, paid export with no preview, or free cloud with no control.",
 
   "decision_bars": {
-    "topology":   {"local_max": 16384, "tripo_min": 10000,  "route": "tripo"},
-    "texture":    {"local": "procedural", "tripo": "4k_pbr", "route": "tripo"},
-    "resolution": {"local": "infinite",  "tripo_max": 4096, "route": "local"},
-    "latency":    {"local_ms": 0,        "tripo_ms": 2500,  "route": "local"},
-    "cost":       {"local": 0,           "tripo_per": 25,   "route": "local"},
-    "rigging":    {"local": false,       "tripo": true,     "route": "tripo"},
-    "iteration":  {"local_sec": 0.016,   "tripo_sec": 45,   "route": "local"}
+    "topology":   {"local_max": 16384, "tripo_min": 10000,  "kaggle": "hunyuan3d", "route": "kaggle"},
+    "texture":    {"local": "procedural", "tripo": "4k_pbr", "kaggle": "pbr",      "route": "kaggle"},
+    "resolution": {"local": "infinite",  "tripo_max": 4096,  "kaggle": "adaptive", "route": "local"},
+    "latency":    {"local_ms": 0,        "tripo_ms": 2500,   "kaggle_ms": 300000,  "route": "local"},
+    "cost":       {"local": 0,           "tripo_per": 25,    "kaggle": 0,          "route": "kaggle"},
+    "rigging":    {"local": false,       "tripo": true,      "kaggle": false,      "route": "tripo"},
+    "iteration":  {"local_sec": 0.016,   "tripo_sec": 45,    "kaggle_sec": 360,    "route": "local"}
+  },
+
+  "kaggle_bars": {
+    "gpu": "teslaP100",
+    "vram_gb": 16,
+    "model": "Hunyuan3D-2",
+    "fallback_model": "Stable Fast 3D",
+    "free_hours_per_week": 30,
+    "concurrent_sessions": 2,
+    "install_time_s": 180,
+    "inference_time_s": 30,
+    "kernel_slug": "sprite-delta-analyst",
+    "api_regression": "no_new_kernels — must use existing kernel slug"
   },
 
   "cost_bars": {
@@ -30,12 +43,15 @@
   "route_logic": {
     "preview": "local",
     "iterate": "local",
-    "final_mesh": "tripo",
-    "textured": "tripo",
+    "final_mesh": "kaggle",
+    "textured": "kaggle",
     "rigged": "tripo",
     "variant_exploration": "local",
     "sprite_sheet_export": "local",
-    "game_ready_glb": "tripo"
+    "game_ready_glb": "kaggle",
+    "production_batch": "kaggle",
+    "quick_test": "local",
+    "paid_quality": "tripo"
   },
 
   "phase5": {
