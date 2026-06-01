@@ -43,10 +43,10 @@ pub struct ZeroSyncDispatch {
     conservation_state: Buffer,
     correction_log: Buffer,
 
-    // Bind group layout
-    bind_group_layout_field: wgpu::BindGroupLayout,
-    bind_group_layout_conservation: wgpu::BindGroupLayout,
-    bind_group_layout_sparse: wgpu::BindGroupLayout,
+    // Bind groups
+    field_bind_group: wgpu::BindGroup,
+    conservation_bind_group: wgpu::BindGroup,
+    sparse_bind_group: wgpu::BindGroup,
 
     // Stats
     frame_count: u64,
@@ -57,7 +57,49 @@ pub struct ZeroSyncDispatch {
 
 impl ZeroSyncDispatch {
     pub fn new(device: Arc<wgpu::Device>, queue: wgpu::Queue, shader_modules: &ShaderModules) -> Self {
-        // ── Bind group layouts ────────────────────────────────
+        // ── Buffers ────────────────────────────────────────────
+        let total_cells: u32 = 200_000_000;  // 200M field cells
+
+        let field_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("field_buffer"),
+            size: (total_cells as u64) * 16,  // 4x f32 per cell
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let invariants_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("conservation_invariants"),
+            size: 6 * 4,  // 6x atomic<f32>
+            usage: BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
+
+        let meta_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("dispatch_meta"),
+            contents: bytemuck::cast_slice(&[
+                31250u32,   // tile_count: 200M / 6400 cells-per-workgroup
+                6400u32,    // cells_per_tile
+                0xFFFFFFFFu32, // active_mask: all active
+                0x3F800000u32, // thermal_limit_pct: 1.0 (f32 bits)
+            ]),
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        });
+
+        let phase_diagram_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("phase_diagram"),
+            size: 256 * 16,  // 256 bands × vec4<f32>
+            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let indirect_dispatch = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("indirect_dispatch"),
+            size: 12,  // u32 × 3
+            usage: BufferUsages::STORAGE | BufferUsages::INDIRECT,
+            mapped_at_creation: false,
+        });
+
+        // ── Bind group layout for field tensor pass ────────────
         let bind_group_layout_field = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("field_tensor_bgl"),
             entries: &[
@@ -76,15 +118,33 @@ impl ZeroSyncDispatch {
                     ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3, visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
+                    count: None,
+                },
             ],
         });
 
-        // ... (additional layouts omitted for brevity — full in repo)
+        let field_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("field_tensor_bg"),
+            layout: &bind_group_layout_field,
+            entries: &[
+                wgpu::BindGroupEntry { binding: 0, resource: field_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 1, resource: invariants_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 2, resource: meta_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry { binding: 3, resource: phase_diagram_buffer.as_entire_binding() },
+            ],
+        });
 
         // ── Pipelines ──────────────────────────────────────────
         let field_tensor_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("field_tensor_update"),
-            layout: None,
+            layout: Some(&device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("field_tensor_pl"),
+                bind_group_layouts: &[&bind_group_layout_field],
+                push_constant_ranges: &[],
+            })),
             module: &shader_modules.field_tensor,
             entry_point: "field_tensor_update",
         });
@@ -96,20 +156,18 @@ impl ZeroSyncDispatch {
             entry_point: "enforce_conservation",
         });
 
-        // ── Buffers ────────────────────────────────────────────
-        let total_cells: u32 = 200_000_000;  // 200M field cells
-        let field_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("field_buffer"),
-            size: (total_cells as u64) * 16,  // 4x f32 per cell
-            usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        let sparse_stream_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("sparse_stream"),
+            layout: None,
+            module: &shader_modules.sparse_stream,
+            entry_point: "sparse_stream_main",
         });
 
-        let indirect_dispatch = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("indirect_dispatch"),
-            size: 12,  // u32 × 3
-            usage: BufferUsages::STORAGE | BufferUsages::INDIRECT,
-            mapped_at_creation: false,
+        let indirect_build_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("indirect_build"),
+            layout: None,
+            module: &shader_modules.indirect_build,
+            entry_point: "build_indirect",
         });
 
         ZeroSyncDispatch {
@@ -117,21 +175,76 @@ impl ZeroSyncDispatch {
             queue,
             field_tensor_pipeline,
             conservation_pipeline,
-            sparse_stream_pipeline: todo!(),
-            indirect_build_pipeline: todo!(),
+            sparse_stream_pipeline,
+            indirect_build_pipeline,
             indirect_dispatch,
             field_buffer,
-            gradient_buffer: todo!(),
-            sparse_nodes: todo!(),
-            spatial_hash: todo!(),
-            conservation_state: todo!(),
-            correction_log: todo!(),
-            bind_group_layout_field,
-            bind_group_layout_conservation: todo!(),
-            bind_group_layout_sparse: todo!(),
+            gradient_buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("gradient_buffer"),
+                size: (total_cells as u64) * 16,  // 4x vec4<f32>
+                usage: BufferUsages::STORAGE,
+                mapped_at_creation: false,
+            }),
+            sparse_nodes: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("sparse_nodes"),
+                size: 1024 * 1024 * 64,  // 64MB sparse octree
+                usage: BufferUsages::STORAGE | BufferUsages::INDIRECT,
+                mapped_at_creation: false,
+            }),
+            spatial_hash: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("spatial_hash"),
+                size: 1024 * 1024 * 4,  // 4MB spatial hash table
+                usage: BufferUsages::STORAGE,
+                mapped_at_creation: false,
+            }),
+            conservation_state: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("conservation_state"),
+                size: 256,  // correction counters + drift accumulators
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            }),
+            correction_log: device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("correction_log"),
+                size: 1024 * 4,  // 1024 correction events per frame max
+                usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC,
+                mapped_at_creation: false,
+            }),
+            field_bind_group,
+            conservation_bind_group: device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("conservation_bg"),
+                layout: &bind_group_layout_field, // reuse same layout
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: field_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: invariants_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 2, resource: meta_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 3, resource: phase_diagram_buffer.as_entire_binding() },
+                ],
+            }),
+            sparse_bind_group: device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("sparse_bg"),
+                layout: &device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    label: Some("sparse_bgl"),
+                    entries: &[
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
+                            count: None,
+                        },
+                        wgpu::BindGroupLayoutEntry {
+                            binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
+                            ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
+                            count: None,
+                        },
+                    ],
+                }),
+                entries: &[
+                    wgpu::BindGroupEntry { binding: 0, resource: field_buffer.as_entire_binding() },
+                    wgpu::BindGroupEntry { binding: 1, resource: sparse_nodes.as_entire_binding() },
+                ],
+            }),
             frame_count: 0,
             total_cells,
-            active_cells: 0,
+            active_cells: total_cells,
             mass_drift: 0.0,
         }
     }
@@ -147,27 +260,45 @@ impl ZeroSyncDispatch {
                 timestamp_writes: None,
             });
             cpass.set_pipeline(&self.field_tensor_pipeline);
+            cpass.set_bind_group(0, &self.field_bind_group, &[]);
             cpass.dispatch_workgroups_indirect(&self.indirect_dispatch, 0);
         }
 
-        // Stage 2: Conservation enforcement
+        // Stage 2: Conservation enforcement — correct drift from invariants buffer
         {
             let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("conservation"),
                 timestamp_writes: None,
             });
             cpass.set_pipeline(&self.conservation_pipeline);
+            cpass.set_bind_group(0, &self.conservation_bind_group, &[]);
             cpass.dispatch_workgroups_indirect(&self.indirect_dispatch, 0);
         }
 
-        // Stage 3: Sparse stream activation (temporal coherence prediction)
-        // Stage 4: Build indirect dispatch for next frame
-        // Stage 5: Mesh generation (dual contouring → render)
-        // Stage 6: Present (handled by swapchain)
+        // Stage 3: Sparse stream — activate/deactivate octree nodes via coherence prediction
+        {
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("sparse_stream"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(&self.sparse_stream_pipeline);
+            cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
+            cpass.dispatch_workgroups(128, 1, 1);
+        }
 
-        // All stages execute on GPU timeline. No CPU readback.
-        // No staging buffers. No fences between stages.
-        // The GPU scheduler resolves dependencies via resource barriers in encoder.
+        // Stage 4: Build indirect dispatch buffer for next frame
+        {
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("indirect_build"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(&self.indirect_build_pipeline);
+            cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
+            cpass.dispatch_workgroups(1, 1, 1);
+        }
+
+        // Stage 5-6: Mesh generation and present are handled externally
+        // by the render bridge (see bridge/mod.rs)
 
         self.frame_count += 1;
         let frame_us = frame_start.elapsed().as_micros();
@@ -193,12 +324,6 @@ impl ZeroSyncDispatch {
         println!("Field tensor shader hot-reloaded ({} bytes)", new_wgsl.len());
         Ok(())
     }
-
-    // ── Conservation proof readback (async, once per N frames) ─
-    pub fn readback_conservation_state(&self) {
-        // Mapped read of conservation_state buffer — only when explicitly requested.
-        // Normal frame loop never touches this path.
-    }
 }
 
 // ── Shader module container ────────────────────────────────────
@@ -222,7 +347,8 @@ pub async fn run() {
         &wgpu::DeviceDescriptor {
             label: Some("Aetherion Continuum"),
             required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                | wgpu::Features::INDIRECT_FIRST_INSTANCE,
+                | wgpu::Features::INDIRECT_FIRST_INSTANCE
+                | wgpu::Features::SHADER_FLOAT_ATOMICS, // required for atomic<f32> in WGSL
             required_limits: wgpu::Limits {
                 max_storage_buffer_binding_size: 1 << 30,  // 1 GB
                 max_compute_workgroup_storage_size: 65536,
@@ -230,7 +356,7 @@ pub async fn run() {
             },
             ..Default::default()
         }, None,
-    ).await.expect("Failed to create device");
+    ).await.expect("Failed to create device — SHADER_FLOAT_ATOMICS may not be supported on this GPU");
 
     let device = Arc::new(device);
 
@@ -238,6 +364,7 @@ pub async fn run() {
     let field_tensor_src = include_str!("../core/field_tensor.wgsl");
     let conservation_src = include_str!("../core/conservation_enforce.wgsl");
     let sparse_stream_src = include_str!("../core/sparse_stream.wgsl");
+    let indirect_build_src = include_str!("../core/indirect_build.wgsl");
 
     let shaders = ShaderModules {
         field_tensor: device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -249,7 +376,9 @@ pub async fn run() {
         sparse_stream: device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("sparse_stream"), source: wgpu::ShaderSource::Wgsl(sparse_stream_src.into()),
         }),
-        indirect_build: todo!(),
+        indirect_build: device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("indirect_build"), source: wgpu::ShaderSource::Wgsl(indirect_build_src.into()),
+        }),
     };
 
     let mut engine = ZeroSyncDispatch::new(device.clone(), queue, &shaders);

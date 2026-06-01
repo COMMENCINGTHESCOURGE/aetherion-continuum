@@ -1,6 +1,9 @@
 //   ρ : φ : ψ : ∇T : ∇M : C
 //   six terms. delete one, the field collapses.
 
+enable chromium_internal_f32_atomics;
+enable chromium_experimental_subgroup_operations;
+
 struct FieldCell {
     rho: f32,
     phi: f32,
@@ -50,6 +53,8 @@ const MOISTURE_DECAY_BAR: f32   = 0.998;  // ¯∇M→∇M' per step
 const FG_OVERHEAT_BAR: f32 = 2.0;        // ¯boil|superheat
 
 const DT: f32 = 0.016;
+
+const CELLS_PER_TILE: u32 = 4096u;      // 64×64 tiles
 
 // ═══ BINDINGS ═══
 
@@ -101,12 +106,18 @@ fn compute_divergence(cell: FieldCell, neighbors: array<FieldCell, 6>) -> f32 {
     return abs(div);
 }
 
+// ═══ CELL COUNT HELPER ═══
+
+fn cell_count(m: DispatchMeta) -> u32 {
+    return m.tile_count * m.cells_per_tile;
+}
+
 // ═══ MAIN KERNEL ═══
 
 @compute @workgroup_size(8, 8, 1)
 fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cell_idx = gid.x + gid.y * 64u + gid.z * 4096u;
-    if cell_idx >= meta.cell_count() { return; }
+    if cell_idx >= cell_count(meta) { return; }
 
     var cell = field[cell_idx];
 
@@ -124,9 +135,17 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
         let n_y_idx = gid.x + ny * 64u + gid.z * 4096u;
         let p_y_idx = gid.x + py * 64u + gid.z * 4096u;
 
-        let neighbor_rho = (field[n_idx].rho + field[p_idx].rho + field[n_y_idx].rho + field[p_y_idx].rho) * PSI_COUPLING_BAR;
+        // Read neighbors BEFORE writing cell — load-after-store hazard
+        let nbr_rho_n = field[n_idx].rho;
+        let nbr_rho_p = field[p_idx].rho;
+        let nbr_rho_ny = field[n_y_idx].rho;
+        let nbr_rho_py = field[p_y_idx].rho;
+        let nbr_phi_n = field[n_idx].phi;
+        let nbr_phi_p = field[p_idx].phi;
+
+        let neighbor_rho = (nbr_rho_n + nbr_rho_p + nbr_rho_ny + nbr_rho_py) * PSI_COUPLING_BAR;
         cell.rho = mix(cell.rho, neighbor_rho, psi_coupling);
-        cell.phi = mix(cell.phi, (field[n_idx].phi + field[p_idx].phi) * 0.5, psi_coupling);
+        cell.phi = mix(cell.phi, (nbr_phi_n + nbr_phi_p) * 0.5, psi_coupling);
     }
 
     if cell.C > HARDEN_START {
@@ -138,12 +157,9 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
         cell.grad_M *= MOISTURE_DECAY_BAR;
     }
 
+    // Write cell BEFORE accumulating invariants
     field[cell_idx] = cell;
 
     atomicAdd(&invariants.mass_total, cell.rho);
     atomicAdd(&invariants.energy_total, cell.phi * cell.rho);
-}
-
-fn meta_cell_count(meta: DispatchMeta) -> u32 {
-    return meta.tile_count * meta.cells_per_tile;
 }
