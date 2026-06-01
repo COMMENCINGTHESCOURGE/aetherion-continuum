@@ -1,5 +1,9 @@
 //   M : E : P  —  mass, energy, momentum
 //   three invariants. violate one, the proof breaks.
+//
+//   accumulate_invariants pass reads global state for drift tracking.
+//   actual atomicAdd accumulation is in field_tensor.wgsl:163-164.
+//   this pass is a diagnostic readout, not a write — keep for drift monitoring.
 
 struct ConservationState {
     mass_drift: f32,

@@ -1,10 +1,5 @@
-// ═══════════════════════════════════════════════════════════════
-// AETHERION-CONTINUUM — Indirect Dispatch Builder
-// GPU-only: reads active octree nodes, writes indirect dispatch
-// buffer (x,y,z workgroup counts) for next frame's field update.
-// ═══════════════════════════════════════════════════════════════
-
-enable chromium_internal_f32_atomics;
+//   active : budget : dispatch
+//   three counters. delete one, indirect dispatch degrades to brute force.
 
 struct SparseNode {
     cell_offset: u32,

@@ -1,8 +1,8 @@
 //   ρ : φ : ψ : ∇T : ∇M : C
 //   six terms. delete one, the field collapses.
 
-enable chromium_internal_f32_atomics;
-enable chromium_experimental_subgroup_operations;
+// Note: atomic<f32> requires SHADER_FLOAT_ATOMICS feature (requested in Rust).
+// For browser WebGPU, uncomment: enable chromium_internal_f32_atomics;
 
 struct FieldCell {
     rho: f32,
