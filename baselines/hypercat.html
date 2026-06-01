@@ -3,38 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HYPERCAT — Hyperrealistic Feline Baseline</title>
+<title>HYPERCAT — 230:500:60000:64000:25</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a0a;overflow:hidden;font-family:'Consolas',monospace;color:#c8c8c8}
 canvas{display:block}
 #hud{position:fixed;top:12px;right:12px;background:rgba(0,0,0,0.78);border:1px solid #2a3a2a;padding:14px 18px;border-radius:3px;font-size:11px;line-height:1.7;z-index:10;pointer-events:none;min-width:240px}
-#hud .label{color:#6a8;font-weight:bold}
-#hud .val{color:#ada}
-#hud .warn{color:#da8}
-#legend{position:fixed;bottom:12px;left:12px;background:rgba(0,0,0,0.7);border:1px solid #2a3a2a;padding:10px 14px;border-radius:3px;font-size:10px;z-index:10;pointer-events:none}
-#legend span{display:inline-block;margin-right:12px}
-.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle}
-.skeleton{background:#6af}.muscle{background:#f66}.fur{background:#da4}.eye{background:#4f8}.ear{background:#f8a}
+#hud .l{color:#6a8;font-weight:bold}
+#hud .v{color:#ada}
 </style>
 </head>
 <body>
 <div id="hud">
-  <div><span class="label">HYPERCAT BASELINE</span></div>
-  <div>bones: <span class="val" id="hud_bones">—</span></div>
-  <div>spine flexion: <span class="val" id="hud_flex">—</span>°</div>
-  <div>stride +<span class="val" id="hud_stride">—</span>%</div>
-  <div>purr: <span class="val" id="hud_purr">—</span> Hz</div>
-  <div>tapetum gain: +<span class="val" id="hud_tapetum">—</span>%</div>
-  <div>pinna angle: <span class="val" id="hud_pinna">—</span>°</div>
-  <div>claw state: <span class="warn" id="hud_claw">—</span></div>
-</div>
-<div id="legend">
-  <span><span class="swatch skeleton"></span>skeleton (230)</span>
-  <span><span class="swatch muscle"></span>muscle</span>
-  <span><span class="swatch fur"></span>fur</span>
-  <span><span class="swatch eye"></span>tapetum</span>
-  <span><span class="swatch ear"></span>pinnae</span>
+  <div><span class="l">230:500:60000:64000:25</span></div>
+  <div>flex: <span class="v" id="h_f">—</span>°</div>
+  <div>stride +<span class="v" id="h_s">—</span>%</div>
+  <div>purr: <span class="v" id="h_p">—</span> Hz</div>
+  <div>tapetum: <span class="v" id="h_t">—</span></div>
 </div>
 
 <script type="importmap">
@@ -44,398 +29,225 @@ canvas{display:block}
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-// ═══ VINCULUM BARS — delete one, realism degrades ═══
-const BARS = {
-  bones: { total: 240, cervical:7, thoracic:13, lumbar:7, sacral:3, caudal:20 },
-  spine: { discRatio:0.25, torsionConst:0.8, archAngle:45, strideGain:0.20 },
-  muscle: { fastTwitchPct:0.80, peakPower:300, jumpForce:5.5, sprint:30/3.6 },
-  fur:   { density:60000, guardLen:35, underLen:12, turingRate:0.03 },
-  eye:   { tapetum:17, rodCone:25, fNumber:1.0, flickerFusion:55, pupilSlit:0.35 },
-  ear:   { pinnaMuscles:32, rotation:180, maxFreq:64, localAcc:5 },
-  purr:  { freq:25, oscillatorRate:0.04 },
-  claw:  { extendTime:0.08, retractTime:0.12, sheathCycle:60 },
-};
+let B;
+const EMBED = {"vocalization":{"purr_frequency_Hz":25},"skeleton":{"cervical_vertebrae":7,"thoracic_vertebrae":13,"lumbar_vertebrae":7,"sacral_vertebrae":3,"caudal_vertebrae_range":[18,23]}};
+async function init() {
+  try { B = await fetch('cat_baseline.json').then(r => r.json()); }
+  catch { B = EMBED; }
+  document.getElementById('h_p').textContent = B.vocalization.purr_frequency_Hz;
+  document.getElementById('h_t').textContent = '45%';
+  build();
+  requestAnimationFrame(animate);
+}
 
-// ═══ SCENE ═══
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a0a);
-scene.fog = new THREE.Fog(0x0a0a0a, 4, 30);
-
-const cam = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 60);
-cam.position.set(0, 2.5, 8);
-cam.lookAt(0, 0.8, 0);
-
+scene.background = new THREE.Color(0x1a1a18);
+scene.fog = new THREE.Fog(0x1a1a18, 5, 35);
+const cam = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 60);
+cam.position.set(1.5, 1.8, 6);
 const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.3;
 document.body.appendChild(renderer.domElement);
 
-const labelRenderer = new CSS2DRenderer();
-labelRenderer.setSize(innerWidth, innerHeight);
-labelRenderer.domElement.style.position = 'fixed';
-labelRenderer.domElement.style.top = '0';
-labelRenderer.domElement.style.pointerEvents = 'none';
-document.body.appendChild(labelRenderer.domElement);
+const ctrl = new OrbitControls(cam, renderer.domElement);
+ctrl.target.set(0,0.5,0); ctrl.enableDamping=true; ctrl.dampingFactor=0.08; ctrl.maxPolarAngle=Math.PI*0.7; ctrl.update();
 
-const controls = new OrbitControls(cam, renderer.domElement);
-controls.target.set(0, 0.7, 0);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.maxPolarAngle = Math.PI * 0.65;
-controls.update();
+scene.add(new THREE.DirectionalLight(0xffeedd,5).translateX(8).translateY(12).translateZ(-4));
+scene.add(new THREE.HemisphereLight(0x8899cc,0x443322,1.2));
+const g = new THREE.Mesh(new THREE.PlaneGeometry(30,30), new THREE.MeshStandardMaterial({color:0x2a2a24,roughness:0.9}));
+g.rotation.x=-Math.PI/2; g.receiveShadow=true; scene.add(g);
 
-// ═══ LIGHTING — dusk hunt ═══
-const sun = new THREE.DirectionalLight(0xffeedd, 4.5);
-sun.position.set(8, 12, -4);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 50;
-sun.shadow.bias = -0.0001;
-scene.add(sun);
+let skeleton, body, fur, eyes, pinnae, claws;
 
-const sky = new THREE.HemisphereLight(0x8899cc, 0x443322, 1.2);
-scene.add(sky);
+function felineBodyShape(x, y, z) {
+  const len = 1.2;
+  const t = (z + len/2) / len;
+  const chestR = 0.22 * (1 - Math.abs(t-0.3)*0.6);
+  const waistR = 0.16 * (1 - Math.abs(t-0.55)*0.3);
+  const r = t < 0.45 ? chestR : waistR;
+  const height = 0.45 + Math.sin(t*Math.PI)*0.08;
+  const dx = Math.abs(x) / (r+0.001);
+  const dy = (y - height*0.5) / (height*0.5 + 0.001);
+  return Math.max(dx, Math.abs(dy)) - 1;
+}
 
-const rim = new THREE.DirectionalLight(0x334466, 2.0);
-rim.position.set(-3, 1, -2);
-scene.add(rim);
+function build() {
+  const bmat = new THREE.MeshStandardMaterial({color:0xd4c8b8, roughness:0.5, metalness:0.05});
+  const sk = B.skeleton;
+  const n = sk.cervical_vertebrae+sk.thoracic_vertebrae+sk.lumbar_vertebrae+sk.sacral_vertebrae;
 
-// ═══ GROUND ═══
-const groundGeo = new THREE.PlaneGeometry(30,30);
-const groundMat = new THREE.MeshStandardMaterial({color:0x2a2a24, roughness:0.9});
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI/2;
-ground.receiveShadow = true;
-scene.add(ground);
-
-// ═══ SKELETON BUILDER ═══
-function buildSkeleton() {
-  const group = new THREE.Group();
-  const boneMat = new THREE.MeshStandardMaterial({color:0x6688ff, roughness:0.3, metalness:0.6, emissive:0x112244, emissiveIntensity:0.3});
-
-  // Spine — 7C + 13T + 7L + 3S = 30 presacral
-  const vertebrae = [];
-  const totalPresacral = BARS.bones.cervical + BARS.bones.thoracic + BARS.bones.lumbar + BARS.bones.sacral;
-
-  for (let i = 0; i < totalPresacral; i++) {
-    const h = 0.025 + (i < BARS.bones.cervical ? 0.008 : i < BARS.bones.cervical+BARS.bones.thoracic ? 0.005 : 0.003);
-    const r = 0.03 - i * 0.0003;
-    const geo = new THREE.CylinderGeometry(r * 0.7, r, h, 8);
-    const v = new THREE.Mesh(geo, boneMat);
-    v.position.set(0, 0.08 + i * h * 1.2, 0);
-    v.castShadow = true;
-    group.add(v);
-    vertebrae.push(v);
+  skeleton = {group:new THREE.Group(), verts:[], tail:null, jaw:null};
+  for (let i = 0; i < n; i++) {
+    const h = 0.03 + (i<7?0.01:i<20?0.006:0.004);
+    const r = 0.035 - i*0.0004;
+    const v = new THREE.Mesh(new THREE.CylinderGeometry(r*0.6,r,h,8), bmat);
+    v.position.set(0, 0.12 + i*h*1.3, -0.55 + i*h*0.9);
+    v.castShadow=true; skeleton.group.add(v); skeleton.verts.push(v);
   }
+  const tf = skeleton.verts[skeleton.verts.length-1].position;
 
-  // Tail — caudal
-  const tailGroup = new THREE.Group();
-  for (let i = 0; i < BARS.bones.caudal; i++) {
-    const s = 0.015 * (1 - i / BARS.bones.caudal);
-    const geo = new THREE.SphereGeometry(s, 6, 4);
-    const v = new THREE.Mesh(geo, boneMat);
-    v.position.set(0, 0, -0.04 - i * 0.035);
-    tailGroup.add(v);
+  skeleton.tail = new THREE.Group();
+  for (let i=0;i<sk.caudal_vertebrae_range[1];i++) {
+    const s = 0.018*(1-i/sk.caudal_vertebrae_range[1]);
+    skeleton.tail.add(new THREE.Mesh(new THREE.SphereGeometry(s,6,4),bmat));
+    skeleton.tail.children[i].position.set(0,0,-0.04-i*0.04);
   }
-  tailGroup.position.set(0, -0.1, -0.45);
-  group.add(tailGroup);
+  skeleton.tail.position.copy(tf).add(new THREE.Vector3(0,-0.02,-0.05));
+  skeleton.group.add(skeleton.tail);
 
-  // Skull
-  const skullGeo = new THREE.SphereGeometry(0.1, 16, 12);
-  skullGeo.scale(1, 1.15, 0.8);
-  const skull = new THREE.Mesh(skullGeo, boneMat);
-  skull.position.y = 0.48;
-  group.add(skull);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.09,16,12),bmat);
+  skull.scale.set(1,1.1,0.75); skull.position.set(0,0.55,-0.02); skeleton.group.add(skull);
 
-  // Jaw
-  const jawGeo = new THREE.BoxGeometry(0.08, 0.02, 0.06);
-  const jaw = new THREE.Mesh(jawGeo, boneMat);
-  jaw.position.set(0, 0.4, 0.04);
-  group.add(jaw);
+  skeleton.jaw = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.018,0.05),bmat);
+  skeleton.jaw.position.set(0,0.46,0.03); skeleton.group.add(skeleton.jaw);
 
-  // Scapulae
-  for (let s = -1; s <= 1; s += 2) {
-    const scapGeo = new THREE.BoxGeometry(0.04, 0.18, 0.02);
-    const scap = new THREE.Mesh(scapGeo, boneMat);
-    scap.position.set(s * 0.13, 0.32, 0);
-    scap.rotation.z = s * 0.3;
-    group.add(scap);
+  for (let s=-1;s<=1;s+=2) {
+    const scap = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.16,0.02),bmat);
+    scap.position.set(s*0.16,0.44,-0.15); scap.rotation.z=s*0.35; skeleton.group.add(scap);
   }
-
-  // Limbs
-  for (let s = -1; s <= 1; s += 2) {
-    // Humerus/Femur
-    const upperGeo = new THREE.CylinderGeometry(0.02, 0.025, 0.22, 8);
-    const upper = new THREE.Mesh(upperGeo, boneMat);
-    upper.position.set(s * 0.17, 0.18, 0);
-    upper.rotation.z = s * 0.15;
-    group.add(upper);
-
-    // Radius+Tibia (unfused radius/ulna)
-    for (let b = 0; b < 2; b++) {
-      const lowerGeo = new THREE.CylinderGeometry(0.012, 0.018, 0.2, 6);
-      const lower = new THREE.Mesh(lowerGeo, boneMat);
-      lower.position.set(s * (0.18 + b * 0.03), -0.02, 0);
-      lower.rotation.z = s * 0.1;
-      group.add(lower);
+  for (let s=-1;s<=1;s+=2) {
+    const up = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.024,0.2,8),bmat);
+    up.position.set(s*0.18,0.28,-0.15); up.rotation.z=s*0.2; skeleton.group.add(up);
+    for (let b=0;b<2;b++) {
+      const lo = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.016,0.18,6),bmat);
+      lo.position.set(s*(0.19+b*0.025),0.1,-0.15); skeleton.group.add(lo);
     }
-
-    // Paws
-    const pawGeo = new THREE.SphereGeometry(0.025, 8, 6);
-    const paw = new THREE.Mesh(pawGeo, boneMat);
-    paw.position.set(s * 0.19, -0.22, 0);
-    group.add(paw);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.022,8,6),bmat);
+    paw.position.set(s*0.2,-0.06,-0.15); skeleton.group.add(paw);
   }
+  for (let i=0;i<sk.thoracic_vertebrae;i++)
+    for (let s=-1;s<=1;s+=2) {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(0.14,0.007,6,8,Math.PI/2+0.35),bmat);
+      rib.position.set(s*0.07,0.2+i*0.035,-0.2+i*0.08);
+      rib.rotation.set(0,s*Math.PI/2,Math.PI/2); rib.scale.y=0.5+i*0.025; skeleton.group.add(rib);
+    }
+  scene.add(skeleton.group);
 
-  // Ribcage
-  for (let i = 0; i < BARS.bones.thoracic; i++) {
-    for (let s = -1; s <= 1; s += 2) {
-      const ribGeo = new THREE.TorusGeometry(0.12, 0.008, 6, 8, Math.PI/2 + 0.3);
-      const rib = new THREE.Mesh(ribGeo, boneMat);
-      rib.position.set(s * 0.06, 0.12 + i * 0.028, 0);
-      rib.rotation.set(0, s * Math.PI/2, Math.PI/2);
-      rib.scale.y = 0.6 + i * 0.02;
-      group.add(rib);
+  body = new THREE.Group();
+  const bgeo = new THREE.CylinderGeometry(0.22,0.18,1.2,24,8);
+  bgeo.scale(1,0.7,1);
+  const bodyMesh = new THREE.Mesh(bgeo, new THREE.MeshStandardMaterial({color:0xcc9966,roughness:0.7}));
+  bodyMesh.position.y = 0.35;
+  bodyMesh.castShadow = true;
+  body.add(bodyMesh);
+
+  const headGeo = new THREE.SphereGeometry(0.1,16,12);
+  headGeo.scale(1,1.05,0.7);
+  const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({color:0xcc9966,roughness:0.6}));
+  head.position.set(0,0.58,-0.04); head.castShadow=true; body.add(head);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.025,0.04,8,4), new THREE.MeshStandardMaterial({color:0xd4886a,roughness:0.5}));
+  nose.position.set(0,0.55,0.07); nose.rotation.x=Math.PI/2; body.add(nose);
+
+  for (let s=-1;s<=1;s+=2) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04,0.12,8,4), new THREE.MeshStandardMaterial({color:0xddaa88,roughness:0.5,side:THREE.DoubleSide}));
+    ear.position.set(s*0.06,0.65,0); ear.rotation.z=s*0.3; ear.rotation.x=-0.15; body.add(ear);
+  }
+  scene.add(body);
+
+  for (let s=-1;s<=1;s+=2) {
+    for (let p=0;p<2;p++) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.045,0.35,12), new THREE.MeshStandardMaterial({color:0xcc9966,roughness:0.7}));
+      leg.position.set(s*0.18,0.05,-0.25+p*0.35); leg.castShadow=true; body.add(leg);
     }
   }
 
-  return { group, vertebrae, tailGroup, skull, jaw };
-}
-
-const skeleton = buildSkeleton();
-scene.add(skeleton.group);
-
-// ═══ FUR — instanced fibers ═══
-function buildFur() {
-  const group = new THREE.Group();
-  const fiberGeo = new THREE.CylinderGeometry(0.002, 0.004, 0.06, 3);
-  const counts = { guard: 800, under: 3000 };
-  const guardMat = new THREE.MeshStandardMaterial({color:0xcc9966, roughness:0.6});
-  const underMat = new THREE.MeshStandardMaterial({color:0xbba090, roughness:0.85});
-
-  for (const [type, count] of Object.entries(counts)) {
-    const mat = type === 'guard' ? guardMat : underMat;
-    const len = type === 'guard' ? BARS.fur.guardLen/1000 : BARS.fur.underLen/1000;
-
-    for (let i = 0; i < count; i++) {
-      const fiber = new THREE.Mesh(fiberGeo.clone(), mat);
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
-      const r = 0.3 + Math.random() * 0.04;
-      fiber.position.set(
-        Math.cos(theta) * Math.sin(phi) * r,
-        0.25 + Math.cos(phi) * r * 0.7,
-        Math.sin(theta) * Math.sin(phi) * r * 0.55
-      );
-      fiber.rotation.set(Math.random()*0.4, Math.random()*Math.PI*2, Math.random()*0.4);
-      fiber.scale.y = 0.5 + Math.random() * 0.8;
-      group.add(fiber);
-    }
+  eyes = new THREE.Group();
+  for (let s=-1;s<=1;s+=2) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.035,24,16), new THREE.MeshStandardMaterial({color:0x111111,roughness:0.1}));
+    e.position.set(s*0.04,0.58,0.06); eyes.add(e);
+    const ir = new THREE.Mesh(new THREE.SphereGeometry(0.022,16,12), new THREE.MeshStandardMaterial({color:0x44aa22,roughness:0.2,emissive:0x114411,emissiveIntensity:0.4}));
+    ir.position.set(s*0.04,0.58,0.065); eyes.add(ir);
+    const tp = new THREE.Mesh(new THREE.SphereGeometry(0.03,8,8), new THREE.MeshStandardMaterial({color:0x88ff88,roughness:0,metalness:0.9,emissive:0x226622,emissiveIntensity:0.7,opacity:0.5,transparent:true}));
+    tp.position.set(s*0.04,0.58,0.062); eyes.add(tp);
+    const sl = new THREE.Mesh(new THREE.BoxGeometry(0.007,0.022,0.004), new THREE.MeshStandardMaterial({color:0x000000,roughness:0}));
+    sl.position.set(s*0.04,0.58,0.068); eyes.add(sl);
   }
-  return group;
-}
+  scene.add(eyes);
 
-const fur = buildFur();
-scene.add(fur);
-
-// ═══ EYES — tapetum lucidum ═══
-function buildEyes() {
-  const group = new THREE.Group();
-  const eyeGeo = new THREE.SphereGeometry(0.04, 24, 16);
-
-  for (let s = -1; s <= 1; s += 2) {
-    // Sclera
-    const sclera = new THREE.Mesh(eyeGeo, new THREE.MeshStandardMaterial({color:0x111111, roughness:0.1}));
-    sclera.position.set(s * 0.045, 0.47, 0.07);
-
-    // Iris — slit pupil
-    const irisGeo = new THREE.SphereGeometry(0.025, 16, 12);
-    const iris = new THREE.Mesh(irisGeo, new THREE.MeshStandardMaterial({color:0x44aa22, roughness:0.2, emissive:0x114411, emissiveIntensity:0.4}));
-    iris.position.copy(sclera.position);
-    iris.position.z += 0.005;
-
-    // Tapetum retroreflector
-    const tapetumGeo = new THREE.SphereGeometry(0.035, 8, 8);
-    const tapetum = new THREE.Mesh(tapetumGeo,
-      new THREE.MeshStandardMaterial({color:0x88ff88, roughness:0, metalness:0.9, emissive:0x226622, emissiveIntensity:0.7, opacity:0.5, transparent:true})
-    );
-    tapetum.position.copy(sclera.position);
-    tapetum.position.z -= 0.003;
-
-    group.add(sclera, iris, tapetum);
-
-    // Pupil slit
-    const slitGeo = new THREE.BoxGeometry(0.008, 0.026, 0.005);
-    const slit = new THREE.Mesh(slitGeo, new THREE.MeshStandardMaterial({color:0x000000, roughness:0}));
-    slit.position.copy(sclera.position);
-    slit.position.z += 0.008;
-    group.add(slit);
+  pinnae = new THREE.Group();
+  for (let s=-1;s<=1;s+=2) {
+    const pg = new THREE.ConeGeometry(0.05,0.13,8,4); pg.rotateZ(s*0.35);
+    const p = new THREE.Mesh(pg, new THREE.MeshStandardMaterial({color:0xddaa88,roughness:0.5,side:THREE.DoubleSide}));
+    p.position.set(s*0.07,0.64,0); p.rotation.y=s*0.25; pinnae.add(p);
   }
-  return group;
-}
+  scene.add(pinnae);
 
-const eyes = buildEyes();
-scene.add(eyes);
-
-// ═══ PINNAE ═══
-function buildPinnae() {
-  const group = new THREE.Group();
-  for (let s = -1; s <= 1; s += 2) {
-    const pinnaGeo = new THREE.ConeGeometry(0.06, 0.14, 8, 4);
-    pinnaGeo.rotateZ(s * 0.4);
-    const pinna = new THREE.Mesh(pinnaGeo, new THREE.MeshStandardMaterial({color:0xddaa88, roughness:0.5, side:THREE.DoubleSide}));
-    pinna.position.set(s * 0.09, 0.53, 0);
-    pinna.rotation.y = s * 0.3;
-    group.add(pinna);
+  claws = [];
+  const cg = new THREE.Group();
+  for (let p=0;p<4;p++) {
+    const s = p<2?-1:1;
+    const cl = new THREE.Mesh(new THREE.ConeGeometry(0.008,0.035,6,3), new THREE.MeshStandardMaterial({color:0xeee8dd,roughness:0.2}));
+    cl.position.set(s*0.2,-0.07,-0.25+(p%2)*0.35); cl.userData={baseY:cl.position.y}; cg.add(cl); claws.push(cl);
   }
-  return group;
-}
+  scene.add(cg);
 
-const pinnae = buildPinnae();
-scene.add(pinnae);
-
-// ═══ CLAWS ═══
-const claws = [];
-function buildClaws() {
-  const group = new THREE.Group();
-  for (let p = 0; p < 4; p++) {
-    const s = p < 2 ? -1 : 1;
-    const clawGeo = new THREE.ConeGeometry(0.01, 0.04, 6, 3);
-    const claw = new THREE.Mesh(clawGeo, new THREE.MeshStandardMaterial({color:0xddd8cc, roughness:0.25}));
-    claw.position.set(s * 0.19, -0.24, (p % 2) * 0.03 - 0.01);
-    claw.userData = { side: s, paw: p % 2, retracted: true, baseY: claw.position.y };
-    group.add(claw);
-    claws.push(claw);
+  fur = new THREE.Group();
+  for (let i=0;i<3000;i++) {
+    const th=Math.random()*Math.PI*2, ph=Math.random()*Math.PI, r=0.22+Math.random()*0.05;
+    const x=Math.cos(th)*Math.sin(ph)*r, y=0.35+Math.cos(ph)*r*0.7, z=Math.sin(th)*Math.sin(ph)*r*0.55;
+    if (Math.abs(z)>0.55) continue;
+    const len = 0.04+Math.random()*0.06;
+    const f = new THREE.Mesh(new THREE.CylinderGeometry(0.002,0.004,len,3), new THREE.MeshStandardMaterial({color:0xcc9966,roughness:0.6}));
+    f.position.set(x,y,z); f.rotation.set(Math.random()*0.5,Math.random()*Math.PI*2,Math.random()*0.5);
+    fur.add(f);
   }
-  return group;
-}
+  scene.add(fur);
 
-const clawGroup = buildClaws();
-scene.add(clawGroup);
-
-// ═══ WHISKERS ═══
-function buildWhiskers() {
-  const group = new THREE.Group();
-  for (let i = 0; i < 12; i++) {
-    const s = i < 6 ? -1 : 1;
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(s * 0.05, 0.44, 0.09),
-      new THREE.Vector3(s * 0.2, 0.44 + (i%3)*0.02, 0.09 + (i%2-0.5)*0.03),
-      new THREE.Vector3(s * 0.3, 0.38, 0.06)
-    );
-    const geo = new THREE.TubeGeometry(curve, 8, 0.002, 4, false);
-    const whisker = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0xeeeeee, roughness:0.3}));
-    group.add(whisker);
+  for (let i=0;i<12;i++) {
+    const s=i<6?-1:1;
+    const c=new THREE.QuadraticBezierCurve3(new THREE.Vector3(s*0.05,0.56,0.07),new THREE.Vector3(s*0.18,0.54+(i%3)*0.02,0.07+(i%2-0.5)*0.03),new THREE.Vector3(s*0.28,0.48,0.05));
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(c,8,0.002,4,false), new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:0.3})));
   }
-  return group;
 }
-scene.add(buildWhiskers());
 
-// ═══ PARTICLES — ambient dust ═══
-const dustGeo = new THREE.BufferGeometry();
-const dustCount = 500;
-const dustPositions = new Float32Array(dustCount * 3);
-for (let i = 0; i < dustCount; i++) {
-  dustPositions[i*3] = (Math.random()-0.5)*6;
-  dustPositions[i*3+1] = Math.random()*3;
-  dustPositions[i*3+2] = (Math.random()-0.5)*6;
-}
-dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-const dustMat = new THREE.PointsMaterial({color:0x998866, size:0.015, opacity:0.4, transparent:true});
-const dust = new THREE.Points(dustGeo, dustMat);
-scene.add(dust);
-
-// ═══ HUD ═══
-document.getElementById('hud_bones').textContent = BARS.bones.total;
-document.getElementById('hud_tapetum').textContent = '45';
-document.getElementById('hud_purr').textContent = BARS.purr.freq;
-document.getElementById('hud_pinna').textContent = BARS.ear.rotation;
-document.getElementById('hud_claw').textContent = 'retracted';
-
-// ═══ ANIMATION LOOP ═══
-const clock = new THREE.Clock();
-
-function animate() {
+const clock=new THREE.Clock();
+function animate(){
   requestAnimationFrame(animate);
-  const t = clock.getElapsedTime();
-  const dt = Math.min(clock.getDelta(), 0.1);
+  if(!B)return;
+  const t=clock.getElapsedTime(), dt=Math.min(clock.getDelta(),0.1);
+  ctrl.update();
+  const breath=Math.sin(t*2.5)*0.5+0.5, arch=breath*40*(Math.PI/180), stride=1+Math.abs(Math.sin(t*3))*0.2;
+  document.getElementById('h_f').textContent=Math.round(breath*40);
+  document.getElementById('h_s').textContent=Math.round((stride-1)*100);
 
-  controls.update();
+  skeleton.verts.forEach((v,i)=>{
+    v.rotation.z=Math.sin(t*3.5+i/skeleton.verts.length*Math.PI*2)*arch*(1-i/skeleton.verts.length*0.3);
+    v.rotation.x=Math.cos(t*3.5+i/skeleton.verts.length*Math.PI)*arch*0.15;
+  });
+  skeleton.tail.rotation.z=Math.sin(t*2)*0.4; skeleton.tail.rotation.y=Math.cos(t*1.7)*0.3;
+  skeleton.jaw.rotation.x=breath*0.06;
 
-  // Spine arch — gallop cycle
-  const breathCycle = Math.sin(t * 2.5) * 0.5 + 0.5;
-  const archAngle = breathCycle * BARS.spine.archAngle * (Math.PI/180);
-  const strideGain = 1 + Math.abs(Math.sin(t * 3.0)) * BARS.spine.strideGain;
-  document.getElementById('hud_flex').textContent = Math.round(breathCycle * BARS.spine.archAngle);
-  document.getElementById('hud_stride').textContent = Math.round((strideGain - 1) * 100);
+  body.children.forEach(c=>{
+    if(c===body.children[0]){ c.scale.y=0.7+Math.sin(t*3.5)*0.05; c.position.y=0.35+Math.sin(t*3.5)*0.03; }
+  });
+  body.position.y = Math.sin(t*0.7)*0.004;
 
-  skeleton.vertebrae.forEach((v, i) => {
-    const phase = i / skeleton.vertebrae.length;
-    v.rotation.z = Math.sin(t * 3.5 + phase * Math.PI * 2) * archAngle * (1 - phase * 0.3);
+  pinnae.children.forEach((p,i)=>{
+    p.rotation.y=(i?-1:1)*(0.25+Math.sin(t*2.3)*0.35);
+    p.rotation.z=(i?-1:1)*0.1+Math.cos(t*1.8)*0.15;
   });
 
-  // Tail sway
-  skeleton.tailGroup.rotation.z = Math.sin(t * 2.0) * 0.4;
-  skeleton.tailGroup.rotation.y = Math.cos(t * 1.7) * 0.3;
+  const purr=0.001*(Math.sin(t*0.7)*0.5+0.5);
+  skeleton.group.position.x=Math.sin(t*Number(B.vocalization.purr_frequency_Hz)*Math.PI*2)*purr;
+  body.position.x=skeleton.group.position.x;
 
-  // Pinna rotation
-  pinnae.children.forEach((p, i) => {
-    p.rotation.y = (i === 0 ? 1 : -1) * (0.3 + Math.sin(t * 2.3) * 0.3);
-    p.rotation.z = (i === 0 ? -1 : 1) * 0.1 + Math.cos(t * 1.8) * 0.15;
-  });
-  document.getElementById('hud_pinna').textContent = Math.round(180 + Math.sin(t * 2.3) * 40);
+  const glow=0.5+Math.sin(t*1.5)*0.3+Math.sin(t*7.3)*0.15;
+  eyes.children.forEach(c=>{if(c.material.emissiveIntensity!==undefined)c.material.emissiveIntensity=glow;});
 
-  // Purr oscillation — vibrate skeleton at 25Hz
-  const purrAmp = 0.0008 * (Math.sin(t * 0.7) * 0.5 + 0.5);
-  skeleton.group.position.x = Math.sin(t * BARS.purr.freq * Math.PI * 2) * purrAmp;
+  const cp=Math.sin(t*0.6);
+  claws.forEach(c=>{c.position.y=c.userData.baseY+(cp>0.3?(cp-0.3)*0.012:0);});
 
-  // Eye tapetum shimmer
-  const tapetumGlow = 0.5 + Math.sin(t * 1.5) * 0.3 + Math.sin(t * 7.3) * 0.15;
-  eyes.children.forEach(c => {
-    if (c.material.emissiveIntensity !== undefined) {
-      c.material.emissiveIntensity = tapetumGlow;
-    }
-  });
-
-  // Jaw — subtle open/close with breathing
-  skeleton.jaw.rotation.x = breathCycle * 0.08;
-
-  // Claw extension cycle
-  const clawPhase = Math.sin(t * 0.6);
-  claws.forEach(c => {
-    const ext = clawPhase > 0.3 ? (clawPhase - 0.3) * 0.015 : 0;
-    c.position.y = c.userData.baseY + ext;
-  });
-  document.getElementById('hud_claw').textContent = clawPhase > 0.3 ? 'extending' : 'retracted';
-
-  // Fur subtle wind response
-  fur.rotation.y += dt * 0.15;
-  fur.position.x = Math.sin(t * 1.3) * 0.02;
-
-  // Dust drift
-  dust.rotation.y += dt * 0.05;
-  dust.material.opacity = 0.25 + breathCycle * 0.2;
-
-  renderer.render(scene, cam);
-  labelRenderer.render(scene, cam);
+  fur.rotation.y+=dt*0.1;
+  renderer.render(scene,cam);
 }
 
-animate();
-
-// Resize
-window.addEventListener('resize', () => {
-  cam.aspect = innerWidth / innerHeight;
-  cam.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  labelRenderer.setSize(innerWidth, innerHeight);
-});
+init();
+window.addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 </body>
 </html>
