@@ -1,0 +1,129 @@
+//   W : L : C  —  wind, LOD, cohesion
+//   three forces on every vertex. delete one, vegetation goes static.
+
+material {
+    name : WindVegetation,
+    parameters : [
+        { type : float,  name : time },
+        { type : float3, name : windDirection },
+        { type : float,  name : windStrength },
+        { type : float,  name : noiseScale },
+        { type : float3, name : cameraPosition },
+        { type : float,  name : lodDistance },
+        { type : sampler2d, name : materialTensor }
+    ],
+    shadingModel : lit,
+    doubleSided : false
+}
+
+vertex {
+    // ═══ VINCULUM BARS ═══
+    // each pair measures a response range. delete one, the bar breaks.
+
+    const FLUTTER_BASE: f32   = 8.5;     // ¯still|flutter
+    const RESPONSE_LO: f32    = 0.3;     // ¯rigid|respond — high cohesion
+    const RESPONSE_HI: f32    = 1.5;     // ¯loose|respond — low cohesion
+    const RESPONSE_MID: f32   = 0.35;    // ¯baseline|response
+    const SWAY_AMOUNT: f32    = 0.12;    // ¯upright|sway
+    const SWAY_FREQ: f32      = 1.2;     // ¯slow|fast
+    const SWAY_PHASE: f32     = 0.3;     // ¯position→phase
+
+    const FADE_START: f32     = 0.7;     // ¯full|fading — fraction of lodDistance
+    const WIND_PHASE_X: f32   = 0.3;     // ¯time→x
+    const WIND_PHASE_Y: f32   = 0.5;     // ¯time→y
+    const WIND_PHASE_Z: f32   = 0.4;     // ¯time→z
+
+    const FBM_AMP0: f32 = 0.6;
+    const FBM_AMP1: f32 = 0.5;
+
+    // ═══ NOISE ═══
+
+    float hash3D(vec3 p) {
+        return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+    }
+
+    float noise3D(vec3 p) {
+        vec3 i = floor(p);
+        vec3 f = fract(p);
+        vec3 u = f * f * (3.0 - 2.0 * f);
+
+        float c000 = hash3D(i);
+        float c100 = hash3D(i + vec3(1,0,0));
+        float c010 = hash3D(i + vec3(0,1,0));
+        float c110 = hash3D(i + vec3(1,1,0));
+        float c001 = hash3D(i + vec3(0,0,1));
+        float c101 = hash3D(i + vec3(1,0,1));
+        float c011 = hash3D(i + vec3(0,1,1));
+        float c111 = hash3D(i + vec3(1,1,1));
+
+        return mix(
+            mix(mix(c000, c100, u.x),
+                mix(c010, c110, u.x), u.y),
+            mix(mix(c001, c101, u.x),
+                mix(c011, c111, u.x), u.y),
+            u.z
+        );
+    }
+
+    float fbm(vec3 p) {
+        float value = 0.0;
+        float amp = FBM_AMP0;
+        float freq = 1.0;
+        value += amp * noise3D(p * freq);
+        freq *= 2.0; amp *= FBM_AMP1;
+        value += amp * noise3D(p * freq);
+        return value;
+    }
+
+    // ═══ VERTEX ═══
+
+    void materialVertex(inout MaterialVertexInputs material) {
+        vec3 worldPos = getCustom0().xyz;
+        float matIdx = getCustom1().x;
+
+        float dist = distance(worldPos, materialParams.cameraPosition);
+        float fade = 1.0 - smoothstep(
+            materialParams.lodDistance * FADE_START,
+            materialParams.lodDistance,
+            dist
+        );
+
+        vec4 tensorSample = texelFetch(materialTensor, ivec2(int(matIdx), 0), 0);
+        float cohesion = tensorSample.r;
+
+        float flutterSpeed = FLUTTER_BASE;
+        float response = RESPONSE_MID * mix(RESPONSE_HI, RESPONSE_LO, cohesion);
+        float swayAmount = SWAY_AMOUNT;
+
+        float t = materialParams.time * flutterSpeed;
+        vec3 windPos = worldPos * materialParams.noiseScale
+                      + vec3(t * WIND_PHASE_X, t * WIND_PHASE_Y, t * WIND_PHASE_Z);
+        float windVal = fbm(windPos);
+        float sway = sin(materialParams.time * SWAY_FREQ + worldPos.x * SWAY_PHASE) * swayAmount;
+        float force = materialParams.windStrength * response * windVal * fade;
+
+        float rotZ = materialParams.windDirection.x * force;
+        float rotX = materialParams.windDirection.z * force;
+        mat3 rot = mat3(
+            cos(rotZ), -sin(rotZ), 0,
+            sin(rotZ),  cos(rotZ), 0,
+            0,          0,          1
+        ) * mat3(
+            1, 0,           0,
+            0, cos(rotX), -sin(rotX),
+            0, sin(rotX),  cos(rotX)
+        );
+
+        material.vertex.xyz = rot * material.vertex.xyz;
+        material.vertex.x += sway;
+    }
+}
+
+fragment {
+    void material(inout MaterialInputs material) {
+        prepareMaterial(material);
+        material.baseColor = vec4(0.3, 0.5, 0.2, 1.0);
+        material.roughness = 0.8;
+        material.metallic  = 0.0;
+    }
+}
