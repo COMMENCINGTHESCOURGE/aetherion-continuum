@@ -29,6 +29,7 @@ body{margin:0;overflow:hidden;background:#0a0a0f;font-family:Consolas,monospace}
 <script type="module">
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -226,12 +227,54 @@ function spawnAnimals(type,cnt){for(let i=0;i<cnt;i++){const a=makeAnimal(type);
 spawnAnimals('bear',3); spawnAnimals('wolf',4); spawnAnimals('bunny',6); spawnAnimals('cat',5);
 document.getElementById('hc').textContent='5';
 
-// ═══ PLAYER ═══
+// ═══ CONTROLS — pointer lock + orbit fallback ═══
 const lockMsg = document.getElementById('lock');
-const ctrl = new PointerLockControls(cam, document.body);
-ctrl.addEventListener('lock',()=>lockMsg.style.display='none');
-ctrl.addEventListener('unlock',()=>lockMsg.style.display='block');
-lockMsg.addEventListener('click',()=>ctrl.lock());
+let ctrl, orbit;
+let usePointerLock = false;
+
+try {
+  ctrl = new PointerLockControls(cam, document.body);
+  ctrl.addEventListener('lock', () => { usePointerLock = true; lockMsg.style.display = 'none'; });
+  ctrl.addEventListener('unlock', () => { usePointerLock = false; lockMsg.style.display = 'block'; });
+} catch(e) {
+  console.warn('PointerLockControls failed, using orbit fallback');
+}
+
+orbit = new OrbitControls(cam, renderer.domElement);
+orbit.target.set(0, 1.5, 0);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.maxPolarAngle = Math.PI * 0.65;
+orbit.enabled = false;
+
+function requestLock() {
+  if (ctrl) {
+    try { ctrl.lock(); }
+    catch(e) { fallbackToOrbit(); }
+  } else {
+    fallbackToOrbit();
+  }
+}
+
+function fallbackToOrbit() {
+  usePointerLock = false;
+  lockMsg.style.display = 'none';
+  orbit.enabled = true;
+  document.getElementById('hud').innerHTML = '<div><span class=\"l\">ORBIT MODE</span> — drag to look, scroll to zoom</div>';
+}
+
+lockMsg.addEventListener('click', requestLock);
+document.addEventListener('click', (e) => {
+  if (!usePointerLock && !orbit.enabled && e.target === document.body) {
+    requestLock();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && orbit.enabled) {
+    orbit.enabled = false;
+    lockMsg.style.display = 'block';
+  }
+});
 const keys={w:false,a:false,s:false,d:false};
 window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k in keys)keys[k]=true;});
 window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k in keys)keys[k]=false;});
@@ -240,7 +283,7 @@ cam.position.copy(player.pos).y+=player.eye;
 
 function updatePlayer(dt){
   const p=player.pos;
-  if(ctrl.isLocked){const d=new THREE.Vector3();cam.getWorldDirection(d);d.y=0;d.normalize();const s=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),d).normalize();const m=new THREE.Vector3();if(keys.w)m.add(d);if(keys.s)m.sub(d);if(keys.d)m.add(s);if(keys.a)m.sub(s);m.normalize().multiplyScalar(player.speed);player.vel.x=m.x;player.vel.z=m.z;}else{player.vel.x=0;player.vel.z=0;}
+  if(usePointerLock){const d=new THREE.Vector3();cam.getWorldDirection(d);d.y=0;d.normalize();const s=new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0),d).normalize();const m=new THREE.Vector3();if(keys.w)m.add(d);if(keys.s)m.sub(d);if(keys.d)m.add(s);if(keys.a)m.sub(s);m.normalize().multiplyScalar(player.speed);player.vel.x=m.x;player.vel.z=m.z;}else{player.vel.x=0;player.vel.z=0;}
   p.x+=player.vel.x*dt;p.z+=player.vel.z*dt;const gy=groundY(p);if(p.y<=gy+0.55){p.y=gy+0.55;player.vel.y=0;}else{player.vel.y-=player.gravity*dt;p.y+=player.vel.y*dt;}
   cam.position.copy(p).y+=player.eye;
 }
@@ -264,6 +307,7 @@ let last=performance.now(),acc=0,FIXED=1/60,wTime=0;
 function animate(){
   const now=performance.now();let dt=Math.min(0.033,(now-last)/1000);last=now;acc+=dt;
   while(acc>=FIXED){updatePlayer(FIXED);acc-=FIXED;}
+  if(orbit&&orbit.enabled) orbit.update();
   updateSun(dt); wTime+=dt; wU.uTime.value=wTime; wU.uCam.value.copy(player.pos);
   skyMat.uniforms.uSun.value=sun.position.clone().normalize();
   updateAnimals(dt);
