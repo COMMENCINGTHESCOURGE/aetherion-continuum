@@ -1,6 +1,13 @@
 //   active : budget : dispatch
 //   three counters. delete one, indirect dispatch degrades to brute force.
 
+struct DispatchMeta {
+    total_cells: u32,
+    active_cells: u32,
+    budget: u32,
+    frame: u32,
+};
+
 struct SparseNode {
     cell_offset: u32,
     lod: u32,
@@ -14,21 +21,12 @@ struct DispatchCmd {
     z: u32,
 };
 
+const MAX_NODES: u32 = 1024u;
+
 @group(0) @binding(0) var<storage, read> field: array<f32>;
 @group(0) @binding(1) var<storage, read_write> sparse_nodes: array<SparseNode>;
-
 @group(0) @binding(2) var<storage, read_write> dispatch_cmd: array<DispatchCmd>;
 @group(0) @binding(3) var<uniform> meta: DispatchMeta;
-
-const MAX_NODES: u32 = 1024u;
-const BUDGET: u32 = 1500u;  // max bricks per frame (from hyperpoly meta-dispatcher)
-
-struct DispatchMeta {
-    total_cells: u32,
-    active_cells: u32,
-    budget: u32,
-    frame: u32,
-};
 
 @compute @workgroup_size(256, 1, 1)
 fn build_indirect(@builtin(global_invocation_id) gid: vec3<u32>) {

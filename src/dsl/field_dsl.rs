@@ -88,6 +88,8 @@ enum Token {
     Transition,
     When,
     Solid, Fluid, Gas,
+    Gt, Lt, Gte, Lte, Eq,
+    DotDot,
 }
 
 struct Tokenizer {
@@ -117,7 +119,27 @@ impl Tokenizer {
                     self.pos += 2; Some(Token::Arrow)
                 } else { self.read_number() }
             }
-            '0'..='9' | '.' => self.read_number(),
+            '>' => {
+                if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
+                    self.pos += 2; Some(Token::Gte)
+                } else { self.pos += 1; Some(Token::Gt) }
+            }
+            '<' => {
+                if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
+                    self.pos += 2; Some(Token::Lte)
+                } else { self.pos += 1; Some(Token::Lt) }
+            }
+            '=' => {
+                if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
+                    self.pos += 2; Some(Token::Eq)
+                } else { self.pos += 1; self.next_token() }
+            }
+            '.' => {
+                if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '.' {
+                    self.pos += 2; Some(Token::DotDot)
+                } else { self.read_number() }
+            }
+            '0'..='9' => self.read_number(),
             'a'..='z' | 'A'..='Z' | '_' => self.read_ident(),
             _ => { self.pos += 1; self.next_token() }
         }
@@ -144,8 +166,18 @@ impl Tokenizer {
 
     fn read_number(&mut self) -> Option<Token> {
         let start = self.pos;
-        while self.pos < self.input.len() && (self.input[self.pos].is_numeric() || self.input[self.pos] == '.' || self.input[self.pos] == '-') {
+        while self.pos < self.input.len() && self.input[self.pos].is_numeric() {
             self.pos += 1;
+        }
+        if self.pos < self.input.len() && self.input[self.pos] == '.' {
+            if self.pos + 1 >= self.input.len() || !self.input[self.pos + 1].is_numeric() {
+                // single dot not followed by digit — not a number
+                return None;
+            }
+            self.pos += 1; // consume '.'
+            while self.pos < self.input.len() && self.input[self.pos].is_numeric() {
+                self.pos += 1;
+            }
         }
         let num_str: String = self.input[start..self.pos].iter().collect();
         num_str.parse::<f32>().ok().map(Token::Number)
@@ -315,11 +347,11 @@ impl Parser {
 
     fn parse_op(&mut self) -> Result<ConstraintOp, String> {
         match self.advance() {
-            Some(Token::Ident(s)) if s == ">" => Ok(ConstraintOp::Gt),
-            Some(Token::Ident(s)) if s == "<" => Ok(ConstraintOp::Lt),
-            Some(Token::Ident(s)) if s == ">=" => Ok(ConstraintOp::Gte),
-            Some(Token::Ident(s)) if s == "<=" => Ok(ConstraintOp::Lte),
-            Some(Token::Ident(s)) if s == "==" => Ok(ConstraintOp::Eq),
+            Some(Token::Gt) => Ok(ConstraintOp::Gt),
+            Some(Token::Lt) => Ok(ConstraintOp::Lt),
+            Some(Token::Gte) => Ok(ConstraintOp::Gte),
+            Some(Token::Lte) => Ok(ConstraintOp::Lte),
+            Some(Token::Eq) => Ok(ConstraintOp::Eq),
             _ => Err("Expected comparison operator".into()),
         }
     }

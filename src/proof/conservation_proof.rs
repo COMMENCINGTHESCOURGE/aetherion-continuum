@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_proof_chain_integrity() {
-        let dir = PathBuf::from("/tmp/aetherion_proof_test");
+        let dir = std::env::temp_dir().join("aetherion_proof_test");
         let mut chain = ProofChain::new(dir.clone());
         chain.append_frame(0, 0.0001, 0.00005, [0.0, 0.0, 0.0], 0, 0, vec![]);
         chain.append_frame(1, 0.0002, 0.00003, [0.0001, 0.0, 0.0], 1, 5, vec![CorrectionEntry {
@@ -228,5 +228,6 @@ mod tests {
 
         let valid = ProofChain::verify_chain(&chain.proofs).unwrap();
         assert!(valid);
+        fs::remove_dir_all(&dir).ok();
     }
 }
