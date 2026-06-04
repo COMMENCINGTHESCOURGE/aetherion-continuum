@@ -7,7 +7,7 @@ struct ConservationState {
     momentum_drift: vec3<f32>,
     total_mass: f32,
     total_energy: f32,
-};
+}
 
 struct CorrectionLog {
     cell_idx: u32,
@@ -15,7 +15,7 @@ struct CorrectionLog {
     post_mass: f32,
     divergence_detected: f32,
     timestamp: f32,
-};
+}
 
 const MASS_EPSILON: f32     = 1e-5;
 const ENERGY_EPSILON: f32   = 1e-4;
@@ -37,6 +37,21 @@ const COHESION_SOLID_FLOOR: f32 = 0.15;
 @group(0) @binding(3) var<storage, read_write> correction_log: array<CorrectionLog>;
 @group(0) @binding(4) var<storage, read_write> log_count: atomic<u32>;
 @group(0) @binding(5) var<uniform> cell_count: u32;
+
+// ═══ VINCULUM FUNCTIONS ═══
+
+fn mod9Classify(ratio: f32) -> u32 {
+    if !isFinite(ratio) { return 0u; }
+    let mod = u32(abs(round(ratio * 100.0))) % 9u;
+    return mod;
+}
+
+fn vinculumRatioClassify(ratio: f32) -> u32 {
+    let mod = mod9Classify(ratio);
+    if mod == 1u || mod == 4u || mod == 7u { return 1u; }  // STABLE
+    if mod == 0u || mod == 3u || mod == 6u { return 2u; }  // BREACH
+    return 3u;  // NEUTRAL
+}
 
 // ═══ ENFORCE ═══
 
@@ -117,6 +132,10 @@ fn enforce_conservation(@builtin(global_invocation_id) gid: vec3<u32>) {
         }
     }
 
+    // Vinculum classification of local mass drift
+    let mass_drift_local = abs(rho - 1.0 / cell_count_f);
+    let mass_classification = vinculumRatioClassify(mass_drift_local * 1000.0);
+
     // Accumulate mass for global correction pass
     atomicAdd(&state.total_mass, cell.x);
 
@@ -127,9 +146,16 @@ fn enforce_conservation(@builtin(global_invocation_id) gid: vec3<u32>) {
 // ═══ GLOBAL ═══
 
 @compute @workgroup_size(1)
-fn global_correction_pass() {
+fn global_correction_pass_vinculum() {
     let mass_drift = state.total_mass - 1.0;
     if abs(mass_drift) > MASS_EPSILON * DRIFT_MULTIPLIER {
         state.mass_drift = mass_drift;
+    }
+
+    let mass_ratio = mass_drift / max(state.total_mass, 0.001);
+    let mass_classification = vinculumRatioClassify(mass_ratio * 1000.0);
+    
+    if mass_classification == 2u {
+        state.total_mass = 1.0;
     }
 }
