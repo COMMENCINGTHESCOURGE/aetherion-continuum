@@ -8,11 +8,11 @@
 
 | Metric | Previous Gen | Aetherion-Continuum |
 |--------|-------------|---------------------|
-| Simulation Throughput | ~5M voxels/frame | **200M+ field cells/frame** |
-| VRAM Footprint | ~800MB (dense/staging) | **<45MB** (quantized sparse + coherence cache) |
-| Host-GPU Sync | 12–24 sync points/frame | **0** (compute→render→swapchain direct) |
-| Material Phase Resolution | 3–4 discrete states | **Continuous 6D tensor** + phase diagram constraints |
-| Dev Iteration Cycle | Compile→Bake→Test (mins) | **Live WGSL hot-reload** (sub-second) |
+| Simulation Throughput | ~5M voxels/frame | **50M field cells/frame** (dense) → **200M+** (sparse streaming, coherence-filtered) |
+| VRAM Footprint | ~800MB (dense/staging) | **~1.6GB dense** (dual vec4 buffers) → **~68MB sparse** (octree + coherence cache, <5% active) |
+| Host-GPU Sync | 12–24 sync points/frame | **Minimal** (camera pos + meta uniforms only; dispatch fully GPU-driven via indirect) |
+| Material Phase Resolution | 3–4 discrete states | **Continuous 8D tensor** (field vec4: ρ,φ,ψ,C | gradient vec4: ∇T,∇M) + phase diagram constraints |
+| Dev Iteration Cycle | Compile→Bake→Test (mins) | **Live WGSL hot-reload** (sub-second, field_tensor kernel only) |
 
 ---
 
@@ -20,9 +20,10 @@
 
 ```
 ┌─────────────────────────────────────────────┐
-│              6D CONTINUUM TENSOR              │
-│  ρ (density) · φ (phase) · ψ (entanglement)  │
-│  ∇T (temp) · ∇M (moisture) · C (cohesion)   │
+│              8D CONTINUUM TENSOR              │
+│  field vec4:  ρ (density) · φ (phase)        │
+│               ψ (entanglement) · C (cohesion)│
+│  gradient vec4: ∇T (temp) · ∇M (moisture)    │
 └──────────────────┬──────────────────────────┘
                    │
     ┌──────────────┼──────────────┐
@@ -30,16 +31,16 @@
 ┌────────┐  ┌────────────┐  ┌──────────┐
 │ Field  │  │ Conservation│  │  Sparse  │
 │ Tensor │  │  Enforce    │  │  Stream  │
-│ Update │──│  (ε < 1e-5) │──│  (45MB)  │
+│ Update │──│  (ε < 1e-5) │──│  (68MB)  │
 └────────┘  └────────────┘  └──────────┘
     │              │              │
     └──────────────┼──────────────┘
                    ▼
          ┌─────────────────┐
          │  SWAPCHAIN      │
-         │  (zero CPU)     │
+         │  (minimal CPU)  │
          └─────────────────┘
-```
+         ```
 
 ---
 

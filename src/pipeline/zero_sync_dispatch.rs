@@ -32,6 +32,8 @@ pub struct ZeroSyncDispatch {
     sparse_bind_group: wgpu::BindGroup,
 
     field_pipeline_layout: wgpu::PipelineLayout,
+    conservation_pipeline_layout: wgpu::PipelineLayout,
+    sparse_stream_pipeline_layout: wgpu::PipelineLayout,
 
     frame_count: u64,
     total_cells: u32,
@@ -178,23 +180,37 @@ impl ZeroSyncDispatch {
             entry_point: "field_tensor_update",
         });
 
+        // Explicit pipeline layout for conservation to match explicit BGL
+        let conservation_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("conservation_pl"),
+            bind_group_layouts: &[&bgl_conservation],
+            push_constant_ranges: &[],
+        });
+
         let conservation_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("conservation_enforce"),
-            layout: None,
+            layout: Some(&conservation_pipeline_layout),
             module: &shader_modules.conservation,
             entry_point: "enforce_conservation",
         });
 
+        // Explicit pipeline layout for sparse_stream to match explicit BGL
+        let sparse_stream_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("sparse_stream_pl"),
+            bind_group_layouts: &[&bgl_sparse],
+            push_constant_ranges: &[],
+        });
+
         let sparse_stream_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("sparse_stream"),
-            layout: None,
+            layout: Some(&sparse_stream_pipeline_layout),
             module: &shader_modules.sparse_stream,
             entry_point: "sparse_stream_activate",
         });
 
         let indirect_build_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some("indirect_build"),
-            layout: None,
+            layout: Some(&sparse_stream_pipeline_layout),
             module: &shader_modules.indirect_build,
             entry_point: "build_indirect",
         });
@@ -326,6 +342,8 @@ impl ZeroSyncDispatch {
                 })
             },
             field_pipeline_layout,
+            conservation_pipeline_layout,
+            sparse_stream_pipeline_layout,
             frame_count: 0,
             total_cells,
             active_cells: total_cells,
@@ -420,8 +438,7 @@ pub async fn run() {
         &wgpu::DeviceDescriptor {
             label: Some("Aetherion Continuum"),
             required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                | wgpu::Features::INDIRECT_FIRST_INSTANCE
-                | wgpu::Features::SHADER_FLOAT_ATOMICS,
+                | wgpu::Features::INDIRECT_FIRST_INSTANCE,
             required_limits: wgpu::Limits {
                 max_storage_buffer_binding_size: 1 << 30,
                 max_compute_workgroup_storage_size: 65536,

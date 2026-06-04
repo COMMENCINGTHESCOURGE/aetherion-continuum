@@ -172,11 +172,12 @@ impl ProofChain {
     ) -> String {
         use sha2::{Sha256, Digest};
         let mut hasher = Sha256::new();
-        hasher.update(frame.to_le_bytes());
+        // Use big-endian for cross-platform consistency
+        hasher.update(frame.to_be_bytes());
         hasher.update(timestamp.as_bytes());
-        hasher.update(mass_drift.to_le_bytes());
-        hasher.update(energy_drift.to_le_bytes());
-        for v in momentum_drift { hasher.update(v.to_le_bytes()); }
+        hasher.update(mass_drift.to_be_bytes());
+        hasher.update(energy_drift.to_be_bytes());
+        for v in momentum_drift { hasher.update(v.to_be_bytes()); }
         hasher.update(prev_hash.as_bytes());
         format!("{:x}", hasher.finalize())
     }

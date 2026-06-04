@@ -51,7 +51,43 @@ fn enforce_conservation(@builtin(global_invocation_id) gid: vec3<u32>) {
     let rho = cell.x;
     let C = cell.w;
     var correction_needed = false;
+
+    // Compute local divergence using 6-connected neighbors (clamped at boundaries)
+    let cell_count_f = f32(cell_count);
+    let grid_dim = u32(pow(cell_count_f, 1.0/3.0)) + 1u;
+    let z = idx / (grid_dim * grid_dim);
+    let y = (idx % (grid_dim * grid_dim)) / grid_dim;
+    let x = idx % grid_dim;
+
     var div: f32 = 0.0;
+    // X neighbors
+    if x > 0u {
+        let px = idx - 1u;
+        div += field[px].x * gradient[px].x;
+    }
+    if x < grid_dim - 1u {
+        let nx = idx + 1u;
+        div -= field[nx].x * gradient[nx].x;
+    }
+    // Y neighbors
+    if y > 0u {
+        let py = idx - grid_dim;
+        div += field[py].x * gradient[py].y;
+    }
+    if y < grid_dim - 1u {
+        let ny = idx + grid_dim;
+        div -= field[ny].x * gradient[ny].y;
+    }
+    // Z neighbors
+    if z > 0u {
+        let pz = idx - grid_dim * grid_dim;
+        div += field[pz].x * gradient[pz].z;
+    }
+    if z < grid_dim - 1u {
+        let nz = idx + grid_dim * grid_dim;
+        div -= field[nz].x * gradient[nz].z;
+    }
+    div = abs(div);
 
     if rho < 0.0 {
         cell.x = 0.0;
@@ -80,6 +116,9 @@ fn enforce_conservation(@builtin(global_invocation_id) gid: vec3<u32>) {
             );
         }
     }
+
+    // Accumulate mass for global correction pass
+    atomicAdd(&state.total_mass, cell.x);
 
     field[idx] = cell;
     gradient[idx] = grad;
