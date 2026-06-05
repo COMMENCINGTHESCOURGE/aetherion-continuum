@@ -8,7 +8,8 @@ struct SparseNode {
     parent_idx: u32,
     depth: u32,
     temporal_coherence: f32,
-    padding: vec2<u32>,
+    active: u32,
+    priority: f32,
 };
 
 struct SpatialHashEntry {

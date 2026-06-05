@@ -9,8 +9,12 @@ struct DispatchMeta {
 };
 
 struct SparseNode {
-    cell_offset: u32,
-    lod: u32,
+    morton_code: u64,
+    child_mask: u32,
+    field_offset: u32,
+    parent_idx: u32,
+    depth: u32,
+    temporal_coherence: f32,
     active: u32,
     priority: f32,
 };
