@@ -448,7 +448,8 @@ pub async fn run() {
         &wgpu::DeviceDescriptor {
             label: Some("Aetherion Continuum"),
             required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                | wgpu::Features::INDIRECT_FIRST_INSTANCE,
+                | wgpu::Features::INDIRECT_FIRST_INSTANCE
+                | wgpu::Features::SHADER_FLOAT_ATOMICS,
             required_limits: wgpu::Limits {
                 max_storage_buffer_binding_size: 1 << 30,
                 max_compute_workgroup_storage_size: 65536,
