@@ -114,11 +114,15 @@ fn sparse_stream_activate(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var node = nodes[node_idx];
 
+    // stream_req.min_corner = camera position, max_corner = camera position + velocity * dt
+    // So camera_vel = (max_corner - min_corner) / dt
+    let dt = 0.016;
+    let camera_vel = (stream_req.max_corner - stream_req.min_corner) / dt;
     let coherence = predict_coherence(
         node,
         stream_req.min_corner,
-        stream_req.max_corner - stream_req.min_corner,
-        0.016,
+        camera_vel,
+        dt,
     );
     node.temporal_coherence = coherence;
 
@@ -139,9 +143,22 @@ fn sparse_stream_activate(@builtin(global_invocation_id) gid: vec3<u32>) {
 
 // ═══ INDIRECT DISPATCH BUILD ═══
 
-@compute @workgroup_size(1)
-fn build_indirect_dispatch() {
-    let count = atomicLoad(&active_count);
-    let workgroups: u32 = (count + WORKGROUP_TILE - 1u) / WORKGROUP_TILE;
-    indirect_dispatch = IndirectDispatch(workgroups, 1u, 1u);
+@compute @workgroup_size(64)
+fn build_indirect_dispatch(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let node_idx = gid.x;
+    if node_idx >= arrayLength(&nodes) { return; }
+
+    let node = nodes[node_idx];
+    if node.temporal_coherence <= COHERENCE_FLOOR { return; }
+
+    // Each active node contributes WORKGROUP_TILE threads worth of work
+    // Accumulate total workgroups atomically
+    let workgroups_per_node = (WORKGROUP_TILE + WORKGROUP_TILE - 1u) / WORKGROUP_TILE; // = 1
+    let old_count = atomicAdd(&indirect_dispatch.x, workgroups_per_node);
+    
+    // Only the last thread to add writes the final y,z (they're always 1,1)
+    if old_count == 0u {
+        indirect_dispatch.y = 1u;
+        indirect_dispatch.z = 1u;
+    }
 }

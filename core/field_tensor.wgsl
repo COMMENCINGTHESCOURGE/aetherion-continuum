@@ -120,6 +120,7 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
         let n_y_idx = gid.x + ny * 64u + gid.z * 4096u;
         let p_y_idx = gid.x + py * 64u + gid.z * 4096u;
 
+        // Preload all neighbor values BEFORE any write to prevent load-after-store hazard
         let nbr_rho_n = field[n_idx].x;
         let nbr_rho_p = field[p_idx].x;
         let nbr_rho_ny = field[n_y_idx].x;
