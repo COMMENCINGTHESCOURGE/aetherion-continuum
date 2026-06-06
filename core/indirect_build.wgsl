@@ -3,33 +3,8 @@
 //   This shader reads the indirect_dispatch built by sparse_stream_activate/build_indirect_dispatch
 //   and validates/copies it to the dispatch_cmd buffer for the field tensor passes.
 
-<<<<<<< HEAD
-struct DispatchMeta {
-    total_cells: u32,
-    active_cells: u32,
-    budget: u32,
-    frame: u32,
-};
-
-struct SparseNode {
-    morton_code: u64,
-    child_mask: u32,
-    field_offset: u32,
-    parent_idx: u32,
-    depth: u32,
-    temporal_coherence: f32,
-    active: u32,
-    priority: f32,
-};
-
-struct DispatchCmd {
-    x: u32,
-    y: u32,
-    z: u32,
-=======
 struct IndirectDispatch {
     x: u32, y: u32, z: u32,
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
 };
 
 const MAX_NODES: u32 = 1024u;
@@ -40,7 +15,7 @@ const MAX_NODES: u32 = 1024u;
 @group(0) @binding(3) var<storage, read_write> active_count: atomic<u32>;
 @group(0) @binding(4) var<storage, read_write> indirect_dispatch: IndirectDispatch;
 
-// Re-declare SparseNode and SpatialHashEntry from sparse_stream for layout compatibility
+// SparseNode and SpatialHashEntry from sparse_stream for layout compatibility
 struct SparseNode {
     morton_code: u64,
     child_mask: u32,

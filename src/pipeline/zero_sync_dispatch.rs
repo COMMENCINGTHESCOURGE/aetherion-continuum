@@ -1,6 +1,6 @@
 use std::sync::Arc;
-use wgpu::{self, util::DeviceExt, Buffer, BufferUsages, CommandEncoder};
 use std::time::Instant;
+use wgpu::{self, util::DeviceExt, Buffer, BufferUsages, CommandEncoder};
 
 pub struct ZeroSyncDispatch {
     device: Arc<wgpu::Device>,
@@ -33,12 +33,9 @@ pub struct ZeroSyncDispatch {
     sparse_bind_group: wgpu::BindGroup,
 
     field_pipeline_layout: wgpu::PipelineLayout,
-<<<<<<< HEAD
     conservation_bgl: wgpu::BindGroupLayout,
-=======
     conservation_pipeline_layout: wgpu::PipelineLayout,
     sparse_stream_pipeline_layout: wgpu::PipelineLayout,
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
 
     frame_count: u64,
     total_cells: u32,
@@ -47,7 +44,11 @@ pub struct ZeroSyncDispatch {
 }
 
 impl ZeroSyncDispatch {
-    pub fn new(device: Arc<wgpu::Device>, queue: wgpu::Queue, shader_modules: &ShaderModules) -> Self {
+    pub fn new(
+        device: Arc<wgpu::Device>,
+        queue: wgpu::Queue,
+        shader_modules: &ShaderModules,
+    ) -> Self {
         let total_cells: u32 = 50_000_000;
 
         let field_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -78,8 +79,8 @@ impl ZeroSyncDispatch {
         let meta_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("dispatch_meta"),
             contents: bytemuck::cast_slice(&[
-                781250u32,   // tile_count: 50M / 64
-                64u32,       // cells_per_tile
+                781250u32,     // tile_count: 50M / 64
+                64u32,         // cells_per_tile
                 0xFFFFFFFFu32, // active_mask: all active
                 0x3F800000u32, // thermal_limit_pct: 1.0
                 0x3F800000u32, // vram_pressure_pct: 1.0
@@ -103,12 +104,7 @@ impl ZeroSyncDispatch {
         let stream_req_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("stream_req"),
             contents: bytemuck::cast_slice(&[
-                -1.0f32, -1.0f32, -1.0f32,
-                0.0f32,
-                1.0f32, 1.0f32, 1.0f32,
-                0.0f32,
-                1.0f32,
-                16.0f32,
+                -1.0f32, -1.0f32, -1.0f32, 0.0f32, 1.0f32, 1.0f32, 1.0f32, 0.0f32, 1.0f32, 16.0f32,
             ]),
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
@@ -133,46 +129,87 @@ impl ZeroSyncDispatch {
             usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
         });
 
-        let bind_group_layout_field = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("field_tensor_bgl"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: true }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None },
-                    count: None,
-                },
-            ],
-        });
+        let bind_group_layout_field =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("field_tensor_bgl"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::COMPUTE,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: false },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+            });
 
         let field_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("field_tensor_bg"),
             layout: &bind_group_layout_field,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: field_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: conservation_state.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: meta_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 3, resource: phase_diagram_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 4, resource: gradient_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: field_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: conservation_state.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: meta_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: phase_diagram_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: gradient_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -199,109 +236,221 @@ impl ZeroSyncDispatch {
         });
 
         // Create bind group layouts
-        let field_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("field_tensor_pl"),
-            bind_group_layouts: &[&bind_group_layout_field],
-            push_constant_ranges: &[],
-        });
+        let field_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("field_tensor_pl"),
+                bind_group_layouts: &[&bind_group_layout_field],
+                push_constant_ranges: &[],
+            });
 
         let conservation_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("conservation_bgl"),
             entries: &[
-                wgpu::BindGroupLayoutEntry { binding: 0, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 3, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 4, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 5, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }, count: None },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
         let bgl_sparse = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("sparse_stream_bgl"),
             entries: &[
-                wgpu::BindGroupLayoutEntry { binding: 0, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 1, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 2, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 3, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
-                wgpu::BindGroupLayoutEntry { binding: 4, visibility: wgpu::ShaderStages::COMPUTE, ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Storage { read_only: false }, has_dynamic_offset: false, min_binding_size: None }, count: None },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
         // Create pipelines
-        let field_tensor_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("field_tensor_update"),
-            layout: Some(&field_pipeline_layout),
-            module: &shader_modules.field_tensor,
-            entry_point: "field_tensor_update",
-        });
+        let field_tensor_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("field_tensor_update"),
+                layout: Some(&field_pipeline_layout),
+                module: &shader_modules.field_tensor,
+                entry_point: "field_tensor_update",
+            });
 
         // Explicit pipeline layout for conservation to match explicit BGL
-        let conservation_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("conservation_pl"),
-            bind_group_layouts: &[&bgl_conservation],
-            push_constant_ranges: &[],
-        });
+        let conservation_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("conservation_pl"),
+                bind_group_layouts: &[&conservation_bgl],
+                push_constant_ranges: &[],
+            });
 
-        let conservation_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("conservation_enforce"),
-<<<<<<< HEAD
-            layout: Some(&conservation_bgl),
-=======
-            layout: Some(&conservation_pipeline_layout),
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
-            module: &shader_modules.conservation,
-            entry_point: "enforce_conservation",
-        });
+        let conservation_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("conservation_enforce"),
+                layout: Some(&conservation_pipeline_layout),
+                module: &shader_modules.conservation,
+                entry_point: "enforce_conservation",
+            });
 
-<<<<<<< HEAD
-        let global_correction_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("global_correction"),
-            layout: Some(&conservation_bgl),
-            module: &shader_modules.conservation,
-            entry_point: "global_correction_pass",
-=======
+        let global_correction_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("global_correction"),
+                layout: Some(&conservation_pipeline_layout),
+                module: &shader_modules.conservation,
+                entry_point: "global_correction_pass",
+            });
+
         // Explicit pipeline layout for sparse_stream to match explicit BGL
-        let sparse_stream_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("sparse_stream_pl"),
-            bind_group_layouts: &[&bgl_sparse],
-            push_constant_ranges: &[],
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
-        });
+        let sparse_stream_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("sparse_stream_pl"),
+                bind_group_layouts: &[&bgl_sparse],
+                push_constant_ranges: &[],
+            });
 
-        let sparse_stream_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("sparse_stream"),
-<<<<<<< HEAD
-            layout: Some(&bgl_sparse),
-=======
-            layout: Some(&sparse_stream_pipeline_layout),
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
-            module: &shader_modules.sparse_stream,
-            entry_point: "sparse_stream_activate",
-        });
+        let sparse_stream_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("sparse_stream"),
+                layout: Some(&sparse_stream_pipeline_layout),
+                module: &shader_modules.sparse_stream,
+                entry_point: "sparse_stream_activate",
+            });
 
-        let indirect_build_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("indirect_build"),
-<<<<<<< HEAD
-            layout: Some(&bgl_sparse),
-=======
-            layout: Some(&sparse_stream_pipeline_layout),
->>>>>>> 04b758c59f52fde8c978f3958d883ed06cde6006
-            module: &shader_modules.indirect_build,
-            entry_point: "build_indirect",
-        });
+        let indirect_build_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("indirect_build"),
+                layout: Some(&sparse_stream_pipeline_layout),
+                module: &shader_modules.indirect_build,
+                entry_point: "build_indirect",
+            });
 
         // NOW create bind groups (all referenced buffers/layouts exist)
         let conservation_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("conservation_bg"),
             layout: &conservation_bgl,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: field_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: gradient_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: conservation_state.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 3, resource: correction_log.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 4, resource: log_count_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 5, resource: cell_count_uniform.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: field_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: gradient_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: conservation_state.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: correction_log.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: log_count_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: cell_count_uniform.as_entire_binding(),
+                },
             ],
         });
 
@@ -309,11 +458,26 @@ impl ZeroSyncDispatch {
             label: Some("sparse_bg"),
             layout: &bgl_sparse,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: sparse_nodes.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 1, resource: spatial_hash.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 2, resource: stream_req_buffer.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 3, resource: sparse_active_count.as_entire_binding() },
-                wgpu::BindGroupEntry { binding: 4, resource: indirect_dispatch.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: sparse_nodes.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: spatial_hash.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: stream_req_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: sparse_active_count.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: indirect_dispatch.as_entire_binding(),
+                },
             ],
         });
 
@@ -406,24 +570,34 @@ impl ZeroSyncDispatch {
         self.frame_count += 1;
         let frame_us = frame_start.elapsed().as_micros();
         if self.frame_count % 60 == 0 {
-            println!("Frame {} | dispatch submitted in {}µs | {:.1} FPS",
-                self.frame_count, frame_us,
-                1_000_000.0 / frame_us as f64);
+            println!(
+                "Frame {} | dispatch submitted in {}µs | {:.1} FPS",
+                self.frame_count,
+                frame_us,
+                1_000_000.0 / frame_us as f64
+            );
         }
     }
 
     pub fn hot_reload_field_tensor(&mut self, new_wgsl: &str) -> Result<(), String> {
-        let module = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("field_tensor_reloaded"),
-            source: wgpu::ShaderSource::Wgsl(new_wgsl.into()),
-        });
-        self.field_tensor_pipeline = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("field_tensor_update"),
-            layout: Some(&self.field_pipeline_layout),
-            module: &module,
-            entry_point: "field_tensor_update",
-        });
-        println!("Field tensor shader hot-reloaded ({} bytes)", new_wgsl.len());
+        let module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("field_tensor_reloaded"),
+                source: wgpu::ShaderSource::Wgsl(new_wgsl.into()),
+            });
+        self.field_tensor_pipeline =
+            self.device
+                .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("field_tensor_update"),
+                    layout: Some(&self.field_pipeline_layout),
+                    module: &module,
+                    entry_point: "field_tensor_update",
+                });
+        println!(
+            "Field tensor shader hot-reloaded ({} bytes)",
+            new_wgsl.len()
+        );
         Ok(())
     }
 }
@@ -438,26 +612,33 @@ pub struct ShaderModules {
 
 pub async fn run() {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
-    let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-        power_preference: wgpu::PowerPreference::HighPerformance,
-        compatible_surface: None,
-        force_fallback_adapter: false,
-    }).await.expect("No GPU adapter found");
+    let adapter = instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: None,
+            force_fallback_adapter: false,
+        })
+        .await
+        .expect("No GPU adapter found");
 
-    let (device, queue) = adapter.request_device(
-        &wgpu::DeviceDescriptor {
-            label: Some("Aetherion Continuum"),
-            required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                | wgpu::Features::INDIRECT_FIRST_INSTANCE
-                | wgpu::Features::SHADER_FLOAT_ATOMICS,
-            required_limits: wgpu::Limits {
-                max_storage_buffer_binding_size: 1 << 30,
-                max_compute_workgroup_storage_size: 65536,
+    let (device, queue) = adapter
+        .request_device(
+            &wgpu::DeviceDescriptor {
+                label: Some("Aetherion Continuum"),
+                required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+                    | wgpu::Features::INDIRECT_FIRST_INSTANCE
+                    | wgpu::Features::SHADER_FLOAT_ATOMICS,
+                required_limits: wgpu::Limits {
+                    max_storage_buffer_binding_size: 1 << 30,
+                    max_compute_workgroup_storage_size: 65536,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
-            ..Default::default()
-        }, None,
-    ).await.expect("Failed to create device");
+            None,
+        )
+        .await
+        .expect("Failed to create device");
 
     let device = Arc::new(device);
 
@@ -469,19 +650,24 @@ pub async fn run() {
 
     let shaders = ShaderModules {
         field_tensor: device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("field_tensor"), source: wgpu::ShaderSource::Wgsl(field_tensor_src.into()),
+            label: Some("field_tensor"),
+            source: wgpu::ShaderSource::Wgsl(field_tensor_src.into()),
         }),
         conservation: device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("conservation"), source: wgpu::ShaderSource::Wgsl(conservation_src.into()),
+            label: Some("conservation"),
+            source: wgpu::ShaderSource::Wgsl(conservation_src.into()),
         }),
         sparse_stream: device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("sparse_stream"), source: wgpu::ShaderSource::Wgsl(sparse_stream_src.into()),
+            label: Some("sparse_stream"),
+            source: wgpu::ShaderSource::Wgsl(sparse_stream_src.into()),
         }),
         indirect_build: device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("indirect_build"), source: wgpu::ShaderSource::Wgsl(indirect_build_src.into()),
+            label: Some("indirect_build"),
+            source: wgpu::ShaderSource::Wgsl(indirect_build_src.into()),
         }),
         gpu_kompress: device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("gpu_kompress"), source: wgpu::ShaderSource::Wgsl(gpu_kompress_src.into()),
+            label: Some("gpu_kompress"),
+            source: wgpu::ShaderSource::Wgsl(gpu_kompress_src.into()),
         }),
     };
 
