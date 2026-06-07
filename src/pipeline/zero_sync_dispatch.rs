@@ -373,7 +373,7 @@ impl ZeroSyncDispatch {
                 module: &shader_modules.field_tensor,
                 entry_point: "field_tensor_update",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
             });
 
         // Explicit pipeline layout for conservation to match explicit BGL
@@ -391,7 +391,7 @@ impl ZeroSyncDispatch {
                 module: &shader_modules.conservation,
                 entry_point: "enforce_conservation",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
             });
 
         let global_correction_pipeline =
@@ -401,7 +401,7 @@ impl ZeroSyncDispatch {
                 module: &shader_modules.conservation,
                 entry_point: "global_correction_pass",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
             });
 
         // Explicit pipeline layout for sparse_stream to match explicit BGL
@@ -419,7 +419,7 @@ impl ZeroSyncDispatch {
                 module: &shader_modules.sparse_stream,
                 entry_point: "sparse_stream_activate",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
             });
 
         let indirect_build_pipeline =
@@ -429,7 +429,7 @@ impl ZeroSyncDispatch {
                 module: &shader_modules.indirect_build,
                 entry_point: "build_indirect",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
             });
 
         // NOW create bind groups (all referenced buffers/layouts exist)
@@ -604,7 +604,7 @@ impl ZeroSyncDispatch {
                     module: &module,
                     entry_point: "field_tensor_update",
                 cache: None,
-                compilation_options: Default::default,
+                compilation_options: Default::default(),
                 });
         println!(
             "Field tensor shader hot-reloaded ({} bytes)",
