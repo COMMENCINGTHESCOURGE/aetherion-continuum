@@ -4,7 +4,6 @@
 // Auto-generates compute shaders, render pipelines, conservation passes.
 // ═══════════════════════════════════════════════════════════════
 
-use std::collections::HashMap;
 
 // ── #field DSL Grammar ─────────────────────────────────────────
 // #field "terrain" {
@@ -501,3 +500,4 @@ mod tests {
         assert!(wgsl.contains("latent"));
     }
 }
+

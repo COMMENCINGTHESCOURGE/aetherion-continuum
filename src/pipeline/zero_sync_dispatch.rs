@@ -372,6 +372,8 @@ impl ZeroSyncDispatch {
                 layout: Some(&field_pipeline_layout),
                 module: &shader_modules.field_tensor,
                 entry_point: "field_tensor_update",
+                cache: None,
+                compilation_options: Default::default,
             });
 
         // Explicit pipeline layout for conservation to match explicit BGL
@@ -388,6 +390,8 @@ impl ZeroSyncDispatch {
                 layout: Some(&conservation_pipeline_layout),
                 module: &shader_modules.conservation,
                 entry_point: "enforce_conservation",
+                cache: None,
+                compilation_options: Default::default,
             });
 
         let global_correction_pipeline =
@@ -396,6 +400,8 @@ impl ZeroSyncDispatch {
                 layout: Some(&conservation_pipeline_layout),
                 module: &shader_modules.conservation,
                 entry_point: "global_correction_pass",
+                cache: None,
+                compilation_options: Default::default,
             });
 
         // Explicit pipeline layout for sparse_stream to match explicit BGL
@@ -412,6 +418,8 @@ impl ZeroSyncDispatch {
                 layout: Some(&sparse_stream_pipeline_layout),
                 module: &shader_modules.sparse_stream,
                 entry_point: "sparse_stream_activate",
+                cache: None,
+                compilation_options: Default::default,
             });
 
         let indirect_build_pipeline =
@@ -420,6 +428,8 @@ impl ZeroSyncDispatch {
                 layout: Some(&sparse_stream_pipeline_layout),
                 module: &shader_modules.indirect_build,
                 entry_point: "build_indirect",
+                cache: None,
+                compilation_options: Default::default,
             });
 
         // NOW create bind groups (all referenced buffers/layouts exist)
@@ -593,6 +603,8 @@ impl ZeroSyncDispatch {
                     layout: Some(&self.field_pipeline_layout),
                     module: &module,
                     entry_point: "field_tensor_update",
+                cache: None,
+                compilation_options: Default::default,
                 });
         println!(
             "Field tensor shader hot-reloaded ({} bytes)",
@@ -627,7 +639,7 @@ pub async fn run() {
                 label: Some("Aetherion Continuum"),
                 required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
                     | wgpu::Features::INDIRECT_FIRST_INSTANCE
-                    | wgpu::Features::SHADER_FLOAT_ATOMICS,
+                    | wgpu::Features::SHADER_ATOMIC_FLOAT,
                 required_limits: wgpu::Limits {
                     max_storage_buffer_binding_size: 1 << 30,
                     max_compute_workgroup_storage_size: 65536,
@@ -685,7 +697,11 @@ pub async fn run() {
             label: Some("frame_encoder"),
         });
         engine.dispatch_frame(&mut encoder);
-        device.queue().submit(Some(encoder.finish()));
+        (&*device).queue().submit(Some(encoder.finish()));
         device.poll(wgpu::Maintain::Wait);
     }
 }
+
+
+
+

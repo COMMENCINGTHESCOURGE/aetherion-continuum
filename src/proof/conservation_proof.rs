@@ -28,7 +28,7 @@ pub struct ConservationProof {
     pub verified: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CorrectionEntry {
     pub cell_idx: u32,
     pub pre_mass: f32,
@@ -232,3 +232,4 @@ mod tests {
         fs::remove_dir_all(&dir).ok();
     }
 }
+
