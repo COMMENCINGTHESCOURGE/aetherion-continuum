@@ -29,14 +29,14 @@ pub enum FieldType {
     GradientMoisture,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PhaseLabel {
     Solid,
     Fluid,
     Gas,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintOp {
     Gt,
     Lt,
