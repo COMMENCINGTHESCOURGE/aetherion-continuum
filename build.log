@@ -1,0 +1,41 @@
+ Downloading crates ...
+  Downloaded wasm-bindgen v0.2.122
+  Downloaded wasm-bindgen-futures v0.4.72
+  Downloaded wasm-bindgen-shared v0.2.122
+  Downloaded wasm-bindgen-macro-support v0.2.122
+  Downloaded wasm-bindgen-macro v0.2.122
+  Downloaded slotmap v1.1.1
+  Downloaded js-sys v0.3.99
+  Downloaded bumpalo v3.20.3
+  Downloaded web-sys v0.3.99
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling wasm-bindgen-shared v0.2.122
+   Compiling rustversion v1.0.22
+   Compiling cfg-if v1.0.4
+   Compiling bumpalo v3.20.3
+   Compiling unicode-ident v1.0.24
+   Compiling slab v0.4.12
+   Compiling once_cell v1.21.4
+   Compiling futures-core v0.3.32
+   Compiling futures-task v0.3.32
+   Compiling pin-project-lite v0.2.17
+   Compiling generic-array v0.14.7
+   Compiling memchr v2.8.1
+   Compiling typenum v1.20.1
+error: linker `link.exe` not found
+  |
+  = note: program not found
+
+note: the msvc targets depend on the msvc linker but `link.exe` was not found
+
+note: please ensure that Visual Studio 2017 or later, or Build Tools for Visual Studio were installed with the Visual C++ option
+
+note: VS Code is a different product, and is not sufficient
+
+error: could not compile `quote` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `generic-array` (build script) due to 1 previous error
+error: could not compile `wasm-bindgen-shared` (build script) due to 1 previous error
+error: could not compile `proc-macro2` (build script) due to 1 previous error
+error: could not compile `rustversion` (build script) due to 1 previous error
