@@ -40,6 +40,7 @@
   <div><span class="label">Mass Drift:</span> <span class="value" id="massDrift">—</span></div>
   <div><span class="label">Conservation:</span> <span class="value" id="conservation">—</span></div>
   <div><span class="label">Corrections:</span> <span class="value" id="corrections">—</span></div>
+  <div><span class="label">GPU Time:</span> <span class="value" id="gpuTime">—</span></div>
 </div>
 <div id="console"></div>
 
@@ -108,7 +109,26 @@ async function init() {
   });
 
   log(`GPU: ${adapter.info.device} | ${adapter.info.vendor}`, 'ok');
-  log(`Cells: ${TOTAL_CELLS.toLocaleString()} (${GRID}³) | VRAM: ${((FIELD_SIZE*2+PHASE_DIAGRAM_SIZE+CORRECTION_LOG_SIZE)/1048576).toFixed(1)}MB`, 'ok');
+    log(`Cells: ${TOTAL_CELLS.toLocaleString()} (${GRID}³) | VRAM: ${((FIELD_SIZE*2+PHASE_DIAGRAM_SIZE+CORRECTION_LOG_SIZE)/1048576).toFixed(1)}MB`, 'ok');
+    // === MT3: Buffer size validation ===
+    const limits = adapter.limits;
+    const fieldVRAM_MB = (FIELD_SIZE + GRADIENT_SIZE + PHASE_DIAGRAM_SIZE + CORRECTION_LOG_SIZE) / 1048576;
+    const maxStorage = limits.maxStorageBufferBindingSize;
+    if (FIELD_SIZE > maxStorage || GRADIENT_SIZE > maxStorage) {
+      log(`FATAL: buffer size ${(FIELD_SIZE/1048576).toFixed(1)}MB exceeds maxStorageBufferBindingSize ${(maxStorage/1048576).toFixed(1)}MB`, 'err');
+      return;
+    }
+    if (FIELD_SIZE + GRADIENT_SIZE > limits.maxBufferSize) {
+      log(`WARN: total VRAM ${fieldVRAM_MB.toFixed(1)}MB near limit`, 'warn');
+    }
+    const maxWG = limits.maxComputeWorkgroupsPerDimension;
+    const wgX = Math.ceil(GRID / 8);
+    if (wgX > maxWG || GRID > maxWG) {
+      log(`FATAL: workgroup dimension ${Math.max(wgX, GRID)} exceeds maxComputeWorkgroupsPerDimension ${maxWG}`, 'err');
+      return;
+    }
+    log(`Buffer validation: ${fieldVRAM_MB.toFixed(1)}MB / ${(maxStorage/1048576).toFixed(0)}MB max | workgroups ${wgX}/${maxWG}`, 'ok');
+
 
   // === LOAD SHADERS ===
   const [fieldSrc, conservationSrc, sparseSrc] = await Promise.all([
@@ -326,6 +346,22 @@ async function init() {
   });
 
   log('Compute pipelines created — 3 entry points', 'ok');
+  // === MT2: Timestamp query set ===
+  const TIMESTAMP_SLOTS = 10; // 2 per pass × 5 passes
+  const timestampQuerySet = device.createQuerySet({
+    type: 'timestamp',
+    count: TIMESTAMP_SLOTS,
+  });
+  const timestampBuffer = device.createBuffer({
+    size: TIMESTAMP_SLOTS * 8, // uint64 per timestamp
+    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+  });
+  const timestampReadBuffer = device.createBuffer({
+    size: TIMESTAMP_SLOTS * 8,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  });
+  const timestampPeriod = 1_000_000 / (80_000_000); // ~12.5ns on modern GPU, convert to μs
+
 
   // === HUD UPDATES ===
   document.getElementById('cellCount').textContent = `${(TOTAL_CELLS / 1000).toFixed(0)}K`;
@@ -357,6 +393,20 @@ async function init() {
     return { massDrift, energyDrift, totalMass, totalEnergy };
   }
 
+
+  // === MT1: Error scope helper ===
+  let _errorCheckFrame = 0;
+  function pushErrorScopes() {
+    device.pushErrorScope('validation');
+    device.pushErrorScope('out-of-memory');
+  }
+  async function popErrorScopes(passName) {
+    const oom = await device.popErrorScope();
+    const validation = await device.popErrorScope();
+    if (validation) log(`GPU VALIDATION [${passName}]: ${validation.message}`, 'err');
+    if (oom) log(`GPU OOM [${passName}]: ${oom.message}`, 'err');
+  }
+
   async function readbackCorrections() {
     const readBuf = device.createBuffer({
       size: 4,
@@ -377,29 +427,33 @@ async function init() {
     requestAnimationFrame(frameLoop);
     frame++;
 
-    // === COMPUTE DISPATCH ===
+    // === MT1+MT2: COMPUTE DISPATCH with error scopes + timestamps ===
     const encoder = device.createCommandEncoder();
+
+    // Error scope check every 60 frames
+    const checkErrors = (frame % 60 === 0);
+    if (checkErrors) pushErrorScopes();
 
     // 1. Field tensor update
     {
-      const pass = encoder.beginComputePass();
+      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } });
       pass.setPipeline(fieldPipeline);
       pass.setBindGroup(0, fieldBG);
       pass.dispatchWorkgroups(
-        Math.ceil(GRID / 8),   // x: 8 workgroups for 64 cells
-        Math.ceil(GRID / 8),   // y: 8 workgroups
-        GRID                    // z: 64 workgroups
+        Math.ceil(GRID / 8),
+        Math.ceil(GRID / 8),
+        GRID
       );
       pass.end();
     }
 
-    // 2. Reset state + log count for this frame
+    // 2. Reset state + log count
     encoder.clearBuffer(stateBuffer, 0, CONSERVATION_STATE_SIZE);
     encoder.clearBuffer(logCountBuffer, 0, 4);
 
     // 3. Conservation enforce
     {
-      const pass = encoder.beginComputePass();
+      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 } });
       pass.setPipeline(enforcePipeline);
       pass.setBindGroup(0, conservationBG);
       pass.dispatchWorkgroups(Math.ceil(TOTAL_CELLS / 64));
@@ -408,25 +462,49 @@ async function init() {
 
     // 4. Global correction
     {
-      const pass = encoder.beginComputePass();
+      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 4, endOfPassWriteIndex: 5 } });
       pass.setPipeline(globalPipeline);
       pass.setBindGroup(0, conservationBG);
       pass.dispatchWorkgroups(1);
       pass.end();
     }
 
-    // 5. Sparse stream histogram (lightweight)
+    // 5. Sparse stream histogram
     {
-      const pass = encoder.beginComputePass();
+      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 6, endOfPassWriteIndex: 7 } });
       pass.setPipeline(sparsePipeline);
       pass.setBindGroup(0, sparseBG);
       pass.dispatchWorkgroups(16);
       pass.end();
     }
 
+    // Resolve timestamps
+    encoder.resolveQuerySet(timestampQuerySet, 0, TIMESTAMP_SLOTS, timestampBuffer, 0);
+    encoder.copyBufferToBuffer(timestampBuffer, 0, timestampReadBuffer, 0, TIMESTAMP_SLOTS * 8);
+
     device.queue.submit([encoder.finish()]);
 
+    // Pop error scopes
+    if (checkErrors) popErrorScopes('dispatch');
+
     // === METRICS (every 30 frames to avoid mapAsync backpressure) ===
+
+      // GPU timestamp readback (every 60 frames)
+      if (frame % 60 === 0) {
+        try {
+          await timestampReadBuffer.mapAsync(GPUMapMode.READ);
+          const timestamps = new BigInt64Array(timestampReadBuffer.getMappedRange());
+          const field_us = Number(timestamps[1] - timestamps[0]) * timestampPeriod;
+          const cons_us = Number(timestamps[3] - timestamps[2]) * timestampPeriod;
+          const global_us = Number(timestamps[5] - timestamps[4]) * timestampPeriod;
+          const total_us = field_us + cons_us + global_us;
+          document.getElementById('gpuTime').textContent = `${total_us.toFixed(0)}μs (F:${field_us.toFixed(0)} C:${cons_us.toFixed(0)} G:${global_us.toFixed(0)})`;
+          timestampReadBuffer.unmap();
+        } catch(e) {
+          // Buffer may still be in use from previous read
+        }
+      }
+
     if (frame % 30 === 0) {
       // FPS
       const now = performance.now();
