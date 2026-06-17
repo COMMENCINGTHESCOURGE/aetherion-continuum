@@ -73,7 +73,7 @@ async function init() {
     requiredFeatures: ['timestamp-query', 'indirect-first-instance'],
     requiredLimits: {
       maxStorageBufferBindingSize: 1 << 30,
-      maxComputeWorkgroupStorageSize: 65536,
+      maxComputeWorkgroupStorageSize: 32768,
       maxComputeWorkgroupsPerDimension: 65535,
     }
   });
