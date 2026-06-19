@@ -11,6 +11,7 @@ pub struct ZeroSyncDispatch {
     global_correction_pipeline: wgpu::ComputePipeline,
     sparse_stream_pipeline: wgpu::ComputePipeline,
     indirect_build_pipeline: wgpu::ComputePipeline,
+    indirect_dispatch_pipeline: wgpu::ComputePipeline,
 
     indirect_dispatch: Buffer,
 
@@ -432,6 +433,16 @@ impl ZeroSyncDispatch {
                 compilation_options: Default::default(),
             });
 
+        let indirect_dispatch_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("build_indirect_dispatch"),
+                layout: Some(&sparse_stream_pipeline_layout),
+                module: &shader_modules.sparse_stream,
+                entry_point: "build_indirect_dispatch",
+                cache: None,
+                compilation_options: Default::default(),
+            });
+
         // NOW create bind groups (all referenced buffers/layouts exist)
         let conservation_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("conservation_bg"),
@@ -499,6 +510,7 @@ impl ZeroSyncDispatch {
             global_correction_pipeline,
             sparse_stream_pipeline,
             indirect_build_pipeline,
+            indirect_dispatch_pipeline,
             indirect_dispatch,
             stream_req_buffer,
             sparse_active_count,
@@ -535,6 +547,16 @@ impl ZeroSyncDispatch {
             cpass.set_pipeline(&self.sparse_stream_pipeline);
             cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
             cpass.dispatch_workgroups(128, 1, 1);
+        }
+
+        {
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("build_indirect_dispatch"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(&self.indirect_dispatch_pipeline);
+            cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
+            cpass.dispatch_workgroups(1, 1, 1);
         }
 
         {

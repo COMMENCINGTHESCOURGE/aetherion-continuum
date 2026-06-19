@@ -146,7 +146,7 @@ fn enforce_conservation(@builtin(global_invocation_id) gid: vec3<u32>) {
 // ═══ GLOBAL ═══
 
 @compute @workgroup_size(1)
-fn global_correction_pass_vinculum() {
+fn global_correction_pass() {
     let mass_drift = state.total_mass - 1.0;
     if abs(mass_drift) > MASS_EPSILON * DRIFT_MULTIPLIER {
         state.mass_drift = mass_drift;
