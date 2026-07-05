@@ -70,16 +70,28 @@ def _smooth_alpha(data, radius):
 # ═══ PHASE 2: BEZIER ═══
 
 def bezier_fit(img, bar):
-    data = np.array(img)
-    alpha = data[:,:,3]
-    binary = (alpha > 128).astype(np.uint8) * 255
+    # Downsample for lightning-fast contour tracing in pure Python
+    orig_w, orig_h = img.size
+    trace_sz = 256
+    scale_w = orig_w / trace_sz
+    scale_h = orig_h / trace_sz
+    
+    alpha_img = img.split()[3]
+    small_alpha = alpha_img.resize((trace_sz, trace_sz), Image.NEAREST)
+    binary = (np.array(small_alpha) > 128).astype(np.uint8) * 255
+    
     contours = _trace_contours(binary)
     if not contours:
         return None
+    
     contour = max(contours, key=len)
-    simplified = _rdp_simplify(contour, bar["rdp_epsilon"])
+    contour_scaled = np.array(contour, dtype=float)
+    contour_scaled[:, 0] *= scale_w
+    contour_scaled[:, 1] *= scale_h
+    
+    simplified = _rdp_simplify(contour_scaled, bar["rdp_epsilon"])
     curves = _cubic_bezier_fit(simplified, bar["bezier_tension"])
-    return {"contour": contour.tolist(), "simplified": simplified.tolist(), "curves": curves}
+    return {"contour": contour_scaled.tolist(), "simplified": simplified.tolist(), "curves": curves}
 
 def _trace_contours(binary):
     contours = []
@@ -104,7 +116,7 @@ def _trace_one(binary, visited, sx, sy):
         for i in range(8):
             nd = (d + i) % 8
             nx, ny = x + dirs[nd][0], y + dirs[nd][1]
-            if 0 <= nx < binary.shape[1] and 0 <= ny < binary.shape[0] and binary[ny,nx] > 0:
+            if 0 <= nx < binary.shape[1] and 0 <= ny < binary.shape[0] and binary[ny,nx] > 0 and not visited[ny,nx]:
                 x, y, d = nx, ny, (nd + 6) % 8
                 found = True
                 break
