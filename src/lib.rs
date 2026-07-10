@@ -6,12 +6,17 @@ pub mod emergence;
 pub mod emergence_utils;
 pub mod field;
 
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+
+#[cfg(not(target_arch = "wasm32"))]
 use pyo3::prelude::*;
 use dsl::field_dsl::{Parser, WgslGenerator};
 use proof::conservation_proof::{ProofChain, ConservationProof, ProofBundle};
 use std::fs;
 
 /// Compiles a `#field` DSL script into a WGSL compute shader.
+#[cfg(not(target_arch = "wasm32"))]
 #[pyfunction]
 fn compile_dsl(source: &str) -> PyResult<String> {
     let mut parser = Parser::new(source);
@@ -25,6 +30,7 @@ fn compile_dsl(source: &str) -> PyResult<String> {
 }
 
 /// Verifies a CRDT-logged invariant proof chain JSON file.
+#[cfg(not(target_arch = "wasm32"))]
 #[pyfunction]
 fn verify_proof_chain(file_path: &str) -> PyResult<bool> {
     let json_data = fs::read_to_string(file_path)
@@ -40,6 +46,7 @@ fn verify_proof_chain(file_path: &str) -> PyResult<bool> {
 }
 
 /// A Python module implemented in Rust for Aetherion-Continuum.
+#[cfg(not(target_arch = "wasm32"))]
 #[pymodule]
 fn aetherion_continuum(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compile_dsl, m)?)?;

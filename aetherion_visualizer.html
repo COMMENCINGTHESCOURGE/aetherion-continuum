@@ -379,14 +379,58 @@ function updateShipSystems(dt){
   bloomPass.strength=0.3+phys.thrust*0.5;
 }
 
-// ═══ HUD ═══
+// ── WebSocket Telemetry Connection ──
+let ws = null;
+let lastWsSend = 0;
+
+function connectWS() {
+  ws = new WebSocket('ws://localhost:8765');
+  ws.onopen = () => console.log("Aetherion connected to ADK agent.");
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.text) console.log("Agent response:", data.text);
+      if (data.events && data.events.length > 0) {
+        console.log("Telemetry triggered events:", data.events);
+        const alertDiv = document.createElement('div');
+        alertDiv.style.color = '#ff3366';
+        alertDiv.style.fontWeight = 'bold';
+        alertDiv.innerText = `⚠️ EVENT: ${data.events.join(', ')}`;
+        document.getElementById('hud').appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 2500);
+      }
+    } catch(err) {
+      console.error("Error parsing agent message:", err);
+    }
+  };
+  ws.onerror = () => console.log("WebSocket agent connection offline.");
+  ws.onclose = () => {
+    setTimeout(connectWS, 5000); // auto reconnect
+  };
+}
+connectWS();
+
+function sendTelemetry(y, speed, resonance) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ y, speed, resonance }));
+  }
+}
+
+// ── HUD ──
 function updateHUD(dt){
   const speed=phys.vel.length();
   const gLoad=Math.abs(phys.vel.y-0)/9.81+1;
+  const altVal=phys.pos.y-getH(phys.pos.x,phys.pos.z);
   document.getElementById('hsp').textContent=Math.round(speed);
   document.getElementById('hg').textContent=gLoad.toFixed(1);
-  document.getElementById('halt').textContent=Math.round(phys.pos.y-getH(phys.pos.x,phys.pos.z));
+  document.getElementById('halt').textContent=Math.round(altVal);
   document.getElementById('hth').textContent=Math.round(phys.thrust*100)+'%';
+
+  const now = performance.now();
+  if (now - lastWsSend > 500) {
+    sendTelemetry(altVal, speed, gLoad);
+    lastWsSend = now;
+  }
 }
 
 // ═══════════════════════════════════════════

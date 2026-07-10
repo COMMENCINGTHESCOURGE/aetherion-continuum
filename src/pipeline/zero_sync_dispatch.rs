@@ -3,8 +3,8 @@ use std::time::Instant;
 use wgpu::{self, util::DeviceExt, Buffer, BufferUsages, CommandEncoder};
 
 pub struct ZeroSyncDispatch {
-    device: Arc<wgpu::Device>,
-    queue: wgpu::Queue,
+    pub device: Arc<wgpu::Device>,
+    pub queue: wgpu::Queue,
 
     field_tensor_pipeline: wgpu::ComputePipeline,
     conservation_pipeline: wgpu::ComputePipeline,
@@ -638,8 +638,7 @@ pub async fn run() {
             &wgpu::DeviceDescriptor {
                 label: Some("Aetherion Continuum"),
                 required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
-                    | wgpu::Features::INDIRECT_FIRST_INSTANCE
-                    | wgpu::Features::SHADER_ATOMIC_FLOAT,
+                    | wgpu::Features::INDIRECT_FIRST_INSTANCE,
                 required_limits: wgpu::Limits {
                     max_storage_buffer_binding_size: 1 << 30,
                     max_compute_workgroup_storage_size: 65536,
@@ -697,7 +696,7 @@ pub async fn run() {
             label: Some("frame_encoder"),
         });
         engine.dispatch_frame(&mut encoder);
-        (&*device).queue().submit(Some(encoder.finish()));
+        engine.queue.submit(Some(encoder.finish()));
         device.poll(wgpu::Maintain::Wait);
     }
 }

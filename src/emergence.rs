@@ -53,9 +53,10 @@ impl Emergence {
             }
         }
 
+        let src_clone = dst.to_vec();
         // Gradient topo pass
         self.dsl.apply_topo(
-            dst,
+            &src_clone,
             dst,
             crate::field::TopoOp::Gradient,
             |t: &Tensor6| t.den,
@@ -69,7 +70,7 @@ impl Emergence {
             ledger.accumulate(t);
         }
         ledger.frame = self.prev_ledger.frame + 1;
-        self.prev_ledger = ledger;
+        self.prev_ledger = ledger.clone();
         ledger
     }
 }

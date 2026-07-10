@@ -26,6 +26,8 @@ pub struct Tensor6 {
     pub mid: f32,
     pub coh: f32,
     pub cst: f32,
+    pub _pad0: f32,
+    pub _pad1: f32,
 }
 
 impl Tensor6 {
@@ -36,6 +38,8 @@ impl Tensor6 {
             mid: 0.0,
             coh: 0.0,
             cst: 0.0,
+            _pad0: 0.0,
+            _pad1: 0.0,
         };
     pub const ID_AIR: f32 = 0.0;
     pub const ID_ROCK: f32 = 1.0;
@@ -50,6 +54,8 @@ impl Tensor6 {
                 mid,
                 coh,
                 cst,
+                _pad0: 0.0,
+                _pad1: 0.0,
             }
     }
 
@@ -79,6 +85,8 @@ impl Tensor6 {
             mid: a.mid, // do not blur material id
             coh: a.coh + (b.coh - a.coh) * t,
             cst: a.cst + (b.cst - a.cst) * t,
+            _pad0: 0.0,
+            _pad1: 0.0,
         }
     }
 }
@@ -87,14 +95,14 @@ impl Tensor6 {
 // 2. SPATIAL HASH — 3D Morton-order + robin-hood bucketing
 // ---------------------------------------------------------------------------
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub struct SpatialKey(u64);
 
 impl SpatialKey {
     #[inline]
     pub fn from_xyz(x: u32, y: u32, z: u32) -> Self {
         // morton3d interleave 10 bits each -> 30 bits total, shifted into low
-        let k = (morton(x) << 20) | (morton(y) << 10) | morton(z);
+        let k = ((morton(x) as u64) << 20) | ((morton(y) as u64) << 10) | (morton(z) as u64);
         Self(k)
     }
 
@@ -120,6 +128,7 @@ fn morton(v: u32) -> u32 {
 // GOVERNOR: every assertion here enters `conservation_proof.rs::check_frame`.
 // ---------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct ConservationLedger {
     pub total_mass: f64,
     pub total_momentum_x: f64,
