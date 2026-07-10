@@ -26,3 +26,11 @@ strip = true
 [[bin]]
 name = "aetherion"
 path = "src/main.rs"
+
+[lib]
+name = "aetherion_continuum"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies.pyo3]
+version = "0.21"
+features = ["extension-module"]

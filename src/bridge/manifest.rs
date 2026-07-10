@@ -77,3 +77,37 @@ impl ExportManifest {
         serde_json::to_string_pretty(self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_manifest_serialization() {
+        let manifest = ExportManifest::new_nanite_meshlet();
+        let json = manifest.to_json().expect("Failed to serialize manifest");
+        assert!(json.contains("Unreal Engine 5"));
+        assert!(json.contains("MeshletCluster"));
+    }
+
+    #[test]
+    fn test_manifest_deserialization() {
+        let json_data = r#"{
+            "engine": "Custom Engine",
+            "version": "1.0",
+            "asset_type": "FieldTensor",
+            "bounds": {
+                "min": [0.0, 0.0, 0.0],
+                "max": [10.0, 10.0, 10.0]
+            },
+            "lod_levels": [],
+            "material_mapping": {
+                "field_channels": []
+            }
+        }"#;
+        
+        let manifest: ExportManifest = serde_json::from_str(json_data).expect("Failed to deserialize manifest");
+        assert_eq!(manifest.engine, "Custom Engine");
+        assert!(matches!(manifest.asset_type, AssetType::FieldTensor));
+    }
+}
