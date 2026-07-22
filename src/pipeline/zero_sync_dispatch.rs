@@ -1,4 +1,5 @@
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 use wgpu::{self, util::DeviceExt, Buffer, BufferUsages, CommandEncoder};
 
@@ -11,6 +12,7 @@ pub struct ZeroSyncDispatch {
     global_correction_pipeline: wgpu::ComputePipeline,
     sparse_stream_pipeline: wgpu::ComputePipeline,
     indirect_build_pipeline: wgpu::ComputePipeline,
+    indirect_dispatch_pipeline: wgpu::ComputePipeline,
 
     indirect_dispatch: Buffer,
 
@@ -71,9 +73,9 @@ impl ZeroSyncDispatch {
             usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        // Init state: {mass_drift:0, energy_drift:0, momentum_drift:[0,0,0], total_mass:1.0, total_energy:1.0}
+        // Init state: {mass_drift:0, energy_drift:0, momentum_drift:[0,0,0], total_mass_fixed:1000000, total_energy:1.0}
         // WGSL layout: 4 + 4 + pad8 + 12 + 4 + 4 = 48 bytes
-        let state_init: [f32; 12] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0];
+        let state_init: [f32; 12] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, f32::from_bits(1_000_000), 1.0, 0.0, 0.0, 0.0];
         queue.write_buffer(&conservation_state, 0, bytemuck::cast_slice(&state_init));
 
         let meta_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -432,6 +434,16 @@ impl ZeroSyncDispatch {
                 compilation_options: Default::default(),
             });
 
+        let indirect_dispatch_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("build_indirect_dispatch"),
+                layout: Some(&sparse_stream_pipeline_layout),
+                module: &shader_modules.sparse_stream,
+                entry_point: "build_indirect_dispatch",
+                cache: None,
+                compilation_options: Default::default(),
+            });
+
         // NOW create bind groups (all referenced buffers/layouts exist)
         let conservation_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("conservation_bg"),
@@ -499,6 +511,7 @@ impl ZeroSyncDispatch {
             global_correction_pipeline,
             sparse_stream_pipeline,
             indirect_build_pipeline,
+            indirect_dispatch_pipeline,
             indirect_dispatch,
             stream_req_buffer,
             sparse_active_count,
@@ -525,6 +538,7 @@ impl ZeroSyncDispatch {
     }
 
     pub fn dispatch_frame(&mut self, encoder: &mut CommandEncoder) {
+        #[cfg(not(target_arch = "wasm32"))]
         let frame_start = Instant::now();
 
         {
@@ -535,6 +549,16 @@ impl ZeroSyncDispatch {
             cpass.set_pipeline(&self.sparse_stream_pipeline);
             cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
             cpass.dispatch_workgroups(128, 1, 1);
+        }
+
+        {
+            let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("build_indirect_dispatch"),
+                timestamp_writes: None,
+            });
+            cpass.set_pipeline(&self.indirect_dispatch_pipeline);
+            cpass.set_bind_group(0, &self.sparse_bind_group, &[]);
+            cpass.dispatch_workgroups(1, 1, 1);
         }
 
         {
@@ -578,14 +602,18 @@ impl ZeroSyncDispatch {
         }
 
         self.frame_count += 1;
-        let frame_us = frame_start.elapsed().as_micros();
-        if self.frame_count % 60 == 0 {
-            println!(
-                "Frame {} | dispatch submitted in {}µs | {:.1} FPS",
-                self.frame_count,
-                frame_us,
-                1_000_000.0 / frame_us as f64
-            );
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let frame_us = frame_start.elapsed().as_micros();
+            if self.frame_count % 60 == 0 {
+                println!(
+                    "Frame {} | dispatch submitted in {}µs | {:.1} FPS",
+                    self.frame_count,
+                    frame_us,
+                    1_000_000.0 / frame_us as f64
+                );
+            }
         }
     }
 
@@ -611,6 +639,11 @@ impl ZeroSyncDispatch {
             new_wgsl.len()
         );
         Ok(())
+    }
+
+    pub fn load_landscape_payload(&self, data: &[f32]) {
+        // Write the raw 32-bit float topology data to the storage buffer
+        self.queue.write_buffer(&self.field_buffer, 0, bytemuck::cast_slice(data));
     }
 }
 

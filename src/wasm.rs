@@ -86,4 +86,8 @@ impl AetherionEngine {
         self.engine.dispatch_frame(&mut encoder);
         self.engine.queue.submit(Some(encoder.finish()));
     }
+
+    pub fn load_landscape(&mut self, payload: &[f32]) {
+        self.engine.load_landscape_payload(payload);
+    }
 }

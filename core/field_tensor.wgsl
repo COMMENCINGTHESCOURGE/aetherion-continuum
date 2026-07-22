@@ -144,4 +144,15 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     field[cell_idx] = cell;
     gradient[cell_idx] = grad;
+
+    // Accumulate divergence into state buffer
+    let nx = (gid.x + 1u) % 64u; let px = (gid.x + 63u) % 64u;
+    let ny = (gid.y + 1u) % 64u; let py = (gid.y + 63u) % 64u;
+    let n_idx_xp = nx + gid.y * 64u + gid.z * 4096u;
+    let n_idx_xm = px + gid.y * 64u + gid.z * 4096u;
+    let n_idx_yp = gid.x + ny * 64u + gid.z * 4096u;
+    let n_idx_ym = gid.x + py * 64u + gid.z * 4096u;
+    let div = abs(field[n_idx_xp].x - field[n_idx_xm].x +
+                  field[n_idx_yp].x - field[n_idx_ym].x) * cell.z;
+    state.mass_drift += div;
 }
