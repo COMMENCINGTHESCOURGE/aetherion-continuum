@@ -4,7 +4,6 @@
 // Auto-generates compute shaders, render pipelines, conservation passes.
 // ═══════════════════════════════════════════════════════════════
 
-
 // ── #field DSL Grammar ─────────────────────────────────────────
 // #field "terrain" {
 //     density: 0.0..1.0 (default: 0.5)
@@ -49,7 +48,7 @@ pub struct Constraint {
     pub field: String,
     pub op: ConstraintOp,
     pub value: f32,
-    pub condition: Option<Box<Constraint>>,  // when <condition>
+    pub condition: Option<Box<Constraint>>, // when <condition>
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +64,7 @@ pub struct PhaseTransition {
 #[derive(Debug, Clone)]
 pub struct FieldDef {
     pub name: String,
-    pub fields: Vec<(String, f32)>,        // (field_name, default_value)
+    pub fields: Vec<(String, f32)>, // (field_name, default_value)
     pub constraints: Vec<Constraint>,
     pub transitions: Vec<PhaseTransition>,
 }
@@ -73,21 +72,27 @@ pub struct FieldDef {
 // ── Tokenizer ──────────────────────────────────────────────────
 #[derive(Debug, PartialEq)]
 enum Token {
-    Directive,     // #
+    Directive, // #
     Ident(String),
     Number(f32),
     LBrace,
     RBrace,
     Colon,
     Semicolon,
-    Arrow,         // ->
-    At,            // @
+    Arrow, // ->
+    At,    // @
     Default,
     Constraint,
     Transition,
     When,
-    Solid, Fluid, Gas,
-    Gt, Lt, Gte, Lte, Eq,
+    Solid,
+    Fluid,
+    Gas,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+    Eq,
     DotDot,
 }
 
@@ -98,60 +103,109 @@ struct Tokenizer {
 
 impl Tokenizer {
     fn new(source: &str) -> Self {
-        Tokenizer { input: source.chars().collect(), pos: 0 }
+        Tokenizer {
+            input: source.chars().collect(),
+            pos: 0,
+        }
     }
 
     fn next_token(&mut self) -> Option<Token> {
         self.skip_whitespace();
-        if self.pos >= self.input.len() { return None; }
+        if self.pos >= self.input.len() {
+            return None;
+        }
 
         let ch = self.input[self.pos];
         match ch {
-            '#' => { self.pos += 1; Some(Token::Directive) }
-            '{' => { self.pos += 1; Some(Token::LBrace) }
-            '}' => { self.pos += 1; Some(Token::RBrace) }
-            ':' => { self.pos += 1; Some(Token::Colon) }
-            ';' => { self.pos += 1; Some(Token::Semicolon) }
-            '@' => { self.pos += 1; Some(Token::At) }
+            '\n' => {
+                self.pos += 1;
+                Some(Token::Semicolon)
+            }
+            '#' => {
+                self.pos += 1;
+                Some(Token::Directive)
+            }
+            '{' => {
+                self.pos += 1;
+                Some(Token::LBrace)
+            }
+            '}' => {
+                self.pos += 1;
+                Some(Token::RBrace)
+            }
+            ':' => {
+                self.pos += 1;
+                Some(Token::Colon)
+            }
+            ';' => {
+                self.pos += 1;
+                Some(Token::Semicolon)
+            }
+            '@' => {
+                self.pos += 1;
+                Some(Token::At)
+            }
             '-' => {
                 if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '>' {
-                    self.pos += 2; Some(Token::Arrow)
-                } else { self.read_number() }
+                    self.pos += 2;
+                    Some(Token::Arrow)
+                } else {
+                    self.read_number()
+                }
             }
             '>' => {
                 if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
-                    self.pos += 2; Some(Token::Gte)
-                } else { self.pos += 1; Some(Token::Gt) }
+                    self.pos += 2;
+                    Some(Token::Gte)
+                } else {
+                    self.pos += 1;
+                    Some(Token::Gt)
+                }
             }
             '<' => {
                 if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
-                    self.pos += 2; Some(Token::Lte)
-                } else { self.pos += 1; Some(Token::Lt) }
+                    self.pos += 2;
+                    Some(Token::Lte)
+                } else {
+                    self.pos += 1;
+                    Some(Token::Lt)
+                }
             }
             '=' => {
                 if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '=' {
-                    self.pos += 2; Some(Token::Eq)
-                } else { self.pos += 1; self.next_token() }
+                    self.pos += 2;
+                    Some(Token::Eq)
+                } else {
+                    self.pos += 1;
+                    self.next_token()
+                }
             }
             '.' => {
                 if self.pos + 1 < self.input.len() && self.input[self.pos + 1] == '.' {
-                    self.pos += 2; Some(Token::DotDot)
+                    self.pos += 2;
+                    Some(Token::DotDot)
                 } else if self.pos + 1 < self.input.len() && self.input[self.pos + 1].is_numeric() {
                     // Leading dot decimal: .5, .123, etc.
                     self.read_number()
                 } else {
-                    self.pos += 1; self.next_token()
+                    self.pos += 1;
+                    self.next_token()
                 }
             }
             '0'..='9' => self.read_number(),
             'a'..='z' | 'A'..='Z' | '_' => self.read_ident(),
-            _ => { self.pos += 1; self.next_token() }
+            _ => {
+                self.pos += 1;
+                self.next_token()
+            }
         }
     }
 
     fn read_ident(&mut self) -> Option<Token> {
         let start = self.pos;
-        while self.pos < self.input.len() && self.input[self.pos].is_alphanumeric() || self.input[self.pos] == '_' {
+        while self.pos < self.input.len()
+            && (self.input[self.pos].is_alphanumeric() || self.input[self.pos] == '_')
+        {
             self.pos += 1;
         }
         let ident: String = self.input[start..self.pos].iter().collect();
@@ -188,7 +242,10 @@ impl Tokenizer {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.pos < self.input.len() && self.input[self.pos].is_whitespace() {
+        while self.pos < self.input.len()
+            && self.input[self.pos].is_whitespace()
+            && self.input[self.pos] != '\n'
+        {
             self.pos += 1;
         }
     }
@@ -210,6 +267,10 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<FieldDef>, String> {
         let mut fields = Vec::new();
         while self.current.is_some() {
+            if self.current == Some(Token::Semicolon) {
+                self.advance();
+                continue;
+            }
             if let Some(field) = self.parse_field_def()? {
                 fields.push(field);
             } else {
@@ -221,10 +282,14 @@ impl Parser {
 
     fn parse_field_def(&mut self) -> Result<Option<FieldDef>, String> {
         // Expect: #field "name" { ... }
-        if self.current != Some(Token::Directive) { return Ok(None); }
+        if self.current != Some(Token::Directive) {
+            return Ok(None);
+        }
         self.advance();
-        if !self.expect_ident("field")? { return Ok(None); }
-        
+        if !self.expect_ident("field")? {
+            return Ok(None);
+        }
+
         let name = if let Some(Token::Ident(n)) = self.advance() {
             n
         } else {
@@ -257,17 +322,30 @@ impl Parser {
                         transitions.push(t);
                     }
                 }
-                _ => { self.advance(); }
+                _ => {
+                    self.advance();
+                }
             }
         }
         self.advance(); // skip '}'
 
-        Ok(Some(FieldDef { name, fields: defaults, constraints, transitions }))
+        Ok(Some(FieldDef {
+            name,
+            fields: defaults,
+            constraints,
+            transitions,
+        }))
     }
 
     fn parse_default(&mut self) -> Result<Option<(String, f32)>, String> {
-        let field_name = if let Some(Token::Ident(n)) = self.advance() { n } else { return Ok(None) };
-        if self.current != Some(Token::Colon) { return Ok(None); }
+        let field_name = if let Some(Token::Ident(n)) = self.advance() {
+            n
+        } else {
+            return Ok(None);
+        };
+        if self.current != Some(Token::Colon) {
+            return Ok(None);
+        }
         self.advance();
         // skip type annotation, capture default
         let mut default_val = 0.0f32;
@@ -290,37 +368,83 @@ impl Parser {
 
     fn parse_constraint(&mut self) -> Result<Option<Constraint>, String> {
         self.advance(); // skip 'constraint'
-        if self.current != Some(Token::Colon) { return Ok(None); }
+        if self.current != Some(Token::Colon) {
+            return Ok(None);
+        }
         self.advance();
         // Simplified: parse "field op value [when condition]"
-        let field = if let Some(Token::Ident(n)) = self.advance() { n } else { return Ok(None) };
+        let field = if let Some(Token::Ident(n)) = self.advance() {
+            n
+        } else {
+            return Ok(None);
+        };
         let op = self.parse_op()?;
-        let value = if let Some(Token::Number(n)) = self.advance() { n } else { return Ok(None) };
+        let value = if let Some(Token::Number(n)) = self.advance() {
+            n
+        } else {
+            return Ok(None);
+        };
         let condition = if self.current == Some(Token::When) {
             self.advance();
             // Parse sub-constraint as condition
-            let cond_field = if let Some(Token::Ident(n)) = self.advance() { n } else { return Ok(None) };
+            let cond_field = if let Some(Token::Ident(n)) = self.advance() {
+                n
+            } else {
+                return Ok(None);
+            };
             let cond_op = self.parse_op()?;
-            let cond_val = if let Some(Token::Number(n)) = self.advance() { n } else { return Ok(None) };
-            Some(Box::new(Constraint { field: cond_field, op: cond_op, value: cond_val, condition: None }))
-        } else { None };
-        if self.current == Some(Token::Semicolon) { self.advance(); }
-        Ok(Some(Constraint { field, op, value, condition }))
+            let cond_val = if let Some(Token::Number(n)) = self.advance() {
+                n
+            } else {
+                return Ok(None);
+            };
+            Some(Box::new(Constraint {
+                field: cond_field,
+                op: cond_op,
+                value: cond_val,
+                condition: None,
+            }))
+        } else {
+            None
+        };
+        if self.current == Some(Token::Semicolon) {
+            self.advance();
+        }
+        Ok(Some(Constraint {
+            field,
+            op,
+            value,
+            condition,
+        }))
     }
 
     fn parse_transition(&mut self) -> Result<Option<PhaseTransition>, String> {
         self.advance(); // skip 'transition'
-        if self.current != Some(Token::Colon) { return Ok(None); }
+        if self.current != Some(Token::Colon) {
+            return Ok(None);
+        }
         self.advance();
         let from = self.parse_phase()?;
-        if self.current != Some(Token::Arrow) { return Ok(None); }
+        if self.current != Some(Token::Arrow) {
+            return Ok(None);
+        }
         self.advance();
         let to = self.parse_phase()?;
-        if self.current != Some(Token::At) { return Ok(None); }
+        if self.current != Some(Token::At) {
+            return Ok(None);
+        }
         self.advance();
-        let trigger_field = if let Some(Token::Ident(n)) = self.advance() { n } else { return Ok(None) };
+        let trigger_field = if let Some(Token::Ident(n)) = self.advance() {
+            n
+        } else {
+            return Ok(None);
+        };
         let trigger_op = self.parse_op()?;
-        let trigger_value = if let Some(Token::Number(n)) = self.advance() { n } else { return Ok(None) };
+        let trigger_value = if let Some(Token::Number(n)) = self.advance() {
+            n
+        } else {
+            return Ok(None);
+        };
         // Parse { latent: N }
         let mut latent = 0.0;
         if self.current == Some(Token::LBrace) {
@@ -329,15 +453,26 @@ impl Parser {
                 if let Some(Token::Ident(s)) = &self.current {
                     if s == "latent" {
                         self.advance();
-                        if self.current == Some(Token::Colon) { self.advance(); }
-                        if let Some(Token::Number(n)) = self.advance() { latent = n; }
+                        if self.current == Some(Token::Colon) {
+                            self.advance();
+                        }
+                        if let Some(Token::Number(n)) = self.advance() {
+                            latent = n;
+                        }
                     }
                 }
                 self.advance();
             }
             self.advance(); // skip '}'
         }
-        Ok(Some(PhaseTransition { from, to, trigger_field, trigger_op, trigger_value, latent_heat: latent }))
+        Ok(Some(PhaseTransition {
+            from,
+            to,
+            trigger_field,
+            trigger_op,
+            trigger_value,
+            latent_heat: latent,
+        }))
     }
 
     fn parse_phase(&mut self) -> Result<PhaseLabel, String> {
@@ -362,7 +497,10 @@ impl Parser {
 
     fn expect_ident(&mut self, expected: &str) -> Result<bool, String> {
         match &self.current {
-            Some(Token::Ident(s)) if s == expected => { self.advance(); Ok(true) }
+            Some(Token::Ident(s)) if s == expected => {
+                self.advance();
+                Ok(true)
+            }
             _ => Ok(false),
         }
     }
@@ -390,7 +528,7 @@ impl WgslGenerator {
                 "@group(0) @binding({}) var<storage, read_write> {}: array<vec4<f32>>;\n",
                 field_idx, field.name
             ));
-            wgsl.push_str("\n");
+            wgsl.push('\n');
 
             // Generate validation constraints as assertion functions
             for constraint in &field.constraints {
@@ -437,7 +575,9 @@ impl WgslGenerator {
         wgsl.push_str("    let dt = 0.016;\n");
         wgsl.push_str("    // Apply all transitions and validations\n");
         wgsl.push_str("    // (generated from DSL constraints)\n");
-        wgsl.push_str("    // Note: each field has unique binding, access via field_0, field_1, etc.\n");
+        wgsl.push_str(
+            "    // Note: each field has unique binding, access via field_0, field_1, etc.\n",
+        );
         wgsl.push_str("}\n");
 
         wgsl
@@ -500,4 +640,3 @@ mod tests {
         assert!(wgsl.contains("latent"));
     }
 }
-
