@@ -3,6 +3,9 @@ use std::sync::Arc;
 use std::time::Instant;
 use wgpu::{self, util::DeviceExt, Buffer, BufferUsages, CommandEncoder};
 
+/// GPU resource aggregate: several fields are held purely for keep-alive /
+/// bind-group structure and are never read from Rust code.
+#[allow(dead_code)]
 pub struct ZeroSyncDispatch {
     pub device: Arc<wgpu::Device>,
     pub queue: wgpu::Queue,
@@ -75,7 +78,20 @@ impl ZeroSyncDispatch {
         });
         // Init state: {mass_drift:0, energy_drift:0, momentum_drift:[0,0,0], total_mass_fixed:1000000, total_energy:1.0}
         // WGSL layout: 4 + 4 + pad8 + 12 + 4 + 4 = 48 bytes
-        let state_init: [f32; 12] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, f32::from_bits(1_000_000), 1.0, 0.0, 0.0, 0.0];
+        let state_init: [f32; 12] = [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            f32::from_bits(1_000_000),
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+        ];
         queue.write_buffer(&conservation_state, 0, bytemuck::cast_slice(&state_init));
 
         let meta_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -602,11 +618,11 @@ impl ZeroSyncDispatch {
         }
 
         self.frame_count += 1;
-        
+
         #[cfg(not(target_arch = "wasm32"))]
         {
             let frame_us = frame_start.elapsed().as_micros();
-            if self.frame_count % 60 == 0 {
+            if self.frame_count.is_multiple_of(60) {
                 println!(
                     "Frame {} | dispatch submitted in {}µs | {:.1} FPS",
                     self.frame_count,
@@ -631,8 +647,8 @@ impl ZeroSyncDispatch {
                     layout: Some(&self.field_pipeline_layout),
                     module: &module,
                     entry_point: "field_tensor_update",
-                cache: None,
-                compilation_options: Default::default(),
+                    cache: None,
+                    compilation_options: Default::default(),
                 });
         println!(
             "Field tensor shader hot-reloaded ({} bytes)",
@@ -650,7 +666,8 @@ impl ZeroSyncDispatch {
 
     pub fn load_landscape_payload(&self, data: &[f32]) {
         // Write the raw 32-bit float topology data to the storage buffer
-        self.queue.write_buffer(&self.field_buffer, 0, bytemuck::cast_slice(data));
+        self.queue
+            .write_buffer(&self.field_buffer, 0, bytemuck::cast_slice(data));
     }
 }
 
@@ -739,7 +756,3 @@ pub async fn run() {
         engine.submit_frame(encoder);
     }
 }
-
-
-
-

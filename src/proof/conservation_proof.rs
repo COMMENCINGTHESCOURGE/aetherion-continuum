@@ -6,11 +6,11 @@
 // Verifiable off-chain. No trust required.
 // ═══════════════════════════════════════════════════════════════
 
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
-use chrono::Utc;
 
 // ── Proof Types ────────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -23,8 +23,8 @@ pub struct ConservationProof {
     pub corrections_applied: u32,
     pub cells_corrected: u32,
     pub invariant_violations: u32,
-    pub hash_prev: String,     // SHA256 of previous proof (CRDT chain)
-    pub hash_self: String,     // SHA256 of this proof
+    pub hash_prev: String, // SHA256 of previous proof (CRDT chain)
+    pub hash_self: String, // SHA256 of this proof
     pub verified: bool,
 }
 
@@ -39,7 +39,7 @@ pub struct CorrectionEntry {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProofBundle {
     pub chain: Vec<ConservationProof>,
-    pub corrections: Vec<Vec<CorrectionEntry>>,  // per-frame corrections
+    pub corrections: Vec<Vec<CorrectionEntry>>, // per-frame corrections
     pub metadata: ProofMetadata,
 }
 
@@ -50,7 +50,7 @@ pub struct ProofMetadata {
     pub total_corrections: u64,
     pub mean_mass_drift: f64,
     pub max_mass_drift: f64,
-    pub invariance_ratio: f64,  // frames_with_zero_violations / total_frames
+    pub invariance_ratio: f64, // frames_with_zero_violations / total_frames
 }
 
 // ── CRDT Chain ─────────────────────────────────────────────────
@@ -73,6 +73,7 @@ impl ProofChain {
     }
 
     /// Append a frame's conservation proof, chaining via SHA256.
+    #[allow(clippy::too_many_arguments)]
     pub fn append_frame(
         &mut self,
         frame: u64,
@@ -87,8 +88,14 @@ impl ProofChain {
         let invariant_violations = if corrections_applied > 0 { 1 } else { 0 };
 
         // Build proof without hash_self first, then compute hash
-        let hash_self = Self::compute_hash(frame, &timestamp, mass_drift, energy_drift,
-                                            momentum_drift, &self.last_hash);
+        let hash_self = Self::compute_hash(
+            frame,
+            &timestamp,
+            mass_drift,
+            energy_drift,
+            momentum_drift,
+            &self.last_hash,
+        );
 
         let proof = ConservationProof {
             frame,
@@ -112,13 +119,23 @@ impl ProofChain {
     /// Export full proof chain to JSON file.
     pub fn export(&self) -> std::io::Result<PathBuf> {
         let total_frames = self.proofs.len() as u64;
-        let total_corrections: u64 = self.proofs.iter().map(|p| p.corrections_applied as u64).sum();
+        let total_corrections: u64 = self
+            .proofs
+            .iter()
+            .map(|p| p.corrections_applied as u64)
+            .sum();
         let mean_mass_drift: f64 = self.proofs.iter().map(|p| p.mass_drift.abs()).sum::<f64>()
             / (total_frames.max(1) as f64);
-        let max_mass_drift: f64 = self.proofs.iter()
+        let max_mass_drift: f64 = self
+            .proofs
+            .iter()
             .map(|p| p.mass_drift.abs())
             .fold(0.0, f64::max);
-        let invariance_ratio: f64 = self.proofs.iter().filter(|p| p.invariant_violations == 0).count() as f64
+        let invariance_ratio: f64 = self
+            .proofs
+            .iter()
+            .filter(|p| p.invariant_violations == 0)
+            .count() as f64
             / (total_frames.max(1) as f64);
 
         let bundle = ProofBundle {
@@ -134,30 +151,51 @@ impl ProofChain {
             },
         };
 
-        let path = self.output_dir.join(format!("proof_chain_{}.json", Utc::now().format("%Y%m%d_%H%M%S")));
+        let path = self.output_dir.join(format!(
+            "proof_chain_{}.json",
+            Utc::now().format("%Y%m%d_%H%M%S")
+        ));
         let json = serde_json::to_string_pretty(&bundle)?;
         let mut file = File::create(&path)?;
         file.write_all(json.as_bytes())?;
-        println!("Conservation proof exported: {} | {} frames | drift {:.6} | invariance {:.1}%",
-            path.display(), total_frames, mean_mass_drift, invariance_ratio * 100.0);
+        println!(
+            "Conservation proof exported: {} | {} frames | drift {:.6} | invariance {:.1}%",
+            path.display(),
+            total_frames,
+            mean_mass_drift,
+            invariance_ratio * 100.0
+        );
         Ok(path)
     }
 
     /// Verify a proof chain for integrity (CRDT link validation).
     pub fn verify_chain(proofs: &[ConservationProof]) -> Result<bool, String> {
-        if proofs.is_empty() { return Ok(true); }
+        if proofs.is_empty() {
+            return Ok(true);
+        }
 
-        let mut prev_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        let mut prev_hash =
+            "0000000000000000000000000000000000000000000000000000000000000000".to_string();
         for proof in proofs {
             if proof.hash_prev != prev_hash {
-                return Err(format!("Chain break at frame {}: expected prev_hash {}, got {}",
-                    proof.frame, prev_hash, proof.hash_prev));
+                return Err(format!(
+                    "Chain break at frame {}: expected prev_hash {}, got {}",
+                    proof.frame, prev_hash, proof.hash_prev
+                ));
             }
-            let computed = Self::compute_hash(proof.frame, &proof.timestamp,
-                proof.mass_drift, proof.energy_drift, proof.momentum_drift, &prev_hash);
+            let computed = Self::compute_hash(
+                proof.frame,
+                &proof.timestamp,
+                proof.mass_drift,
+                proof.energy_drift,
+                proof.momentum_drift,
+                &prev_hash,
+            );
             if computed != proof.hash_self {
-                return Err(format!("Hash mismatch at frame {}: expected {}, computed {}",
-                    proof.frame, proof.hash_self, computed));
+                return Err(format!(
+                    "Hash mismatch at frame {}: expected {}, computed {}",
+                    proof.frame, proof.hash_self, computed
+                ));
             }
             prev_hash = proof.hash_self.clone();
         }
@@ -165,19 +203,23 @@ impl ProofChain {
     }
 
     fn compute_hash(
-        frame: u64, timestamp: &str,
-        mass_drift: f64, energy_drift: f64,
+        frame: u64,
+        timestamp: &str,
+        mass_drift: f64,
+        energy_drift: f64,
         momentum_drift: [f64; 3],
         prev_hash: &str,
     ) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         // Use big-endian for cross-platform consistency
         hasher.update(frame.to_be_bytes());
         hasher.update(timestamp.as_bytes());
         hasher.update(mass_drift.to_be_bytes());
         hasher.update(energy_drift.to_be_bytes());
-        for v in momentum_drift { hasher.update(v.to_be_bytes()); }
+        for v in momentum_drift {
+            hasher.update(v.to_be_bytes());
+        }
         hasher.update(prev_hash.as_bytes());
         format!("{:x}", hasher.finalize())
     }
@@ -186,7 +228,7 @@ impl ProofChain {
 // ── Live Proof Monitor ─────────────────────────────────────────
 pub struct ProofMonitor {
     chain: ProofChain,
-    export_interval: u64,  // export every N frames
+    export_interval: u64, // export every N frames
     frames_since_export: u64,
 }
 
@@ -199,12 +241,25 @@ impl ProofMonitor {
         }
     }
 
-    pub fn record_frame(&mut self, mass_drift: f64, energy_drift: f64,
-                        momentum: [f64; 3], corrections: u32, cells: u32,
-                        frame_corrections: Vec<CorrectionEntry>) {
+    pub fn record_frame(
+        &mut self,
+        mass_drift: f64,
+        energy_drift: f64,
+        momentum: [f64; 3],
+        corrections: u32,
+        cells: u32,
+        frame_corrections: Vec<CorrectionEntry>,
+    ) {
         let frame = self.chain.proofs.len() as u64;
-        self.chain.append_frame(frame, mass_drift, energy_drift, momentum,
-                                corrections, cells, frame_corrections);
+        self.chain.append_frame(
+            frame,
+            mass_drift,
+            energy_drift,
+            momentum,
+            corrections,
+            cells,
+            frame_corrections,
+        );
         self.frames_since_export += 1;
 
         if self.frames_since_export >= self.export_interval {
@@ -223,13 +278,23 @@ mod tests {
         let dir = std::env::temp_dir().join("aetherion_proof_test");
         let mut chain = ProofChain::new(dir.clone());
         chain.append_frame(0, 0.0001, 0.00005, [0.0, 0.0, 0.0], 0, 0, vec![]);
-        chain.append_frame(1, 0.0002, 0.00003, [0.0001, 0.0, 0.0], 1, 5, vec![CorrectionEntry {
-            cell_idx: 42, pre_mass: 0.5, post_mass: 0.4998, divergence: 0.001,
-        }]);
+        chain.append_frame(
+            1,
+            0.0002,
+            0.00003,
+            [0.0001, 0.0, 0.0],
+            1,
+            5,
+            vec![CorrectionEntry {
+                cell_idx: 42,
+                pre_mass: 0.5,
+                post_mass: 0.4998,
+                divergence: 0.001,
+            }],
+        );
 
         let valid = ProofChain::verify_chain(&chain.proofs).unwrap();
         assert!(valid);
         fs::remove_dir_all(&dir).ok();
     }
 }
-

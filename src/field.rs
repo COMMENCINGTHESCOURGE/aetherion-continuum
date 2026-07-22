@@ -6,8 +6,7 @@
 //! `emergence.rs` or `conservation_proof.rs`. If it has zero callers
 //! after insertion, it gets pruned before commit.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 
 // ---------------------------------------------------------------------------
 // 1. 6-CHANNEL TENSOR LAYOUT
@@ -32,15 +31,15 @@ pub struct Tensor6 {
 
 impl Tensor6 {
     pub const ZERO: Self = Self {
-            den: 0.0,
-            vel: 0.0,
-            tmp: 0.0,
-            mid: 0.0,
-            coh: 0.0,
-            cst: 0.0,
-            _pad0: 0.0,
-            _pad1: 0.0,
-        };
+        den: 0.0,
+        vel: 0.0,
+        tmp: 0.0,
+        mid: 0.0,
+        coh: 0.0,
+        cst: 0.0,
+        _pad0: 0.0,
+        _pad1: 0.0,
+    };
     pub const ID_AIR: f32 = 0.0;
     pub const ID_ROCK: f32 = 1.0;
     pub const ID_WATER: f32 = 2.0;
@@ -48,15 +47,15 @@ impl Tensor6 {
     #[inline]
     pub fn new(den: f32, vel: f32, tmp: f32, mid: f32, coh: f32, cst: f32) -> Self {
         Self {
-                den,
-                vel,
-                tmp,
-                mid,
-                coh,
-                cst,
-                _pad0: 0.0,
-                _pad1: 0.0,
-            }
+            den,
+            vel,
+            tmp,
+            mid,
+            coh,
+            cst,
+            _pad0: 0.0,
+            _pad1: 0.0,
+        }
     }
 
     /// mass-weighted average velocity over a neighborhood
@@ -138,16 +137,22 @@ pub struct ConservationLedger {
     pub frame: u64,
 }
 
+impl Default for ConservationLedger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConservationLedger {
     pub fn new() -> Self {
         Self {
-                total_mass: 0.0,
-                total_momentum_x: 0.0,
-                total_momentum_y: 0.0,
-                total_momentum_z: 0.0,
-                total_thermal: 0.0,
-                frame: 0,
-            }
+            total_mass: 0.0,
+            total_momentum_x: 0.0,
+            total_momentum_y: 0.0,
+            total_momentum_z: 0.0,
+            total_thermal: 0.0,
+            frame: 0,
+        }
     }
 
     /// accumulate one tensor into the running ledger.
@@ -195,16 +200,18 @@ pub struct EntityHandle {
 }
 
 impl EntityHandle {
-    pub const fn null() -> Self { Self {
-                tag: 0,
-                gen: 0,
-                idx: 0,
-            } }
+    pub const fn null() -> Self {
+        Self {
+            tag: 0,
+            gen: 0,
+            idx: 0,
+        }
+    }
 
     #[inline]
     pub fn is_null(self) -> bool {
-            self.tag == 0
-        }
+        self.tag == 0
+    }
 }
 
 /// sparse set archetype store
@@ -225,12 +232,12 @@ impl ArchetypeStore {
         let handles: Vec<EntityHandle> = vec![EntityHandle::null(); capacity];
         let next_gen: Vec<u16> = vec![1; capacity];
         Self {
-                kind,
-                tensors,
-                keys,
-                handles,
-                next_gen,
-            }
+            kind,
+            tensors,
+            keys,
+            handles,
+            next_gen,
+        }
     }
 
     /// insert or upsert a tensor at key. returns handle.
@@ -264,16 +271,16 @@ impl ArchetypeStore {
     #[inline]
     pub fn get(&self, h: EntityHandle) -> Option<&Tensor6> {
         if h.tag != self.kind as u32 {
-                return None;
-            }
+            return None;
+        }
         self.tensors.get(h.idx as usize)
     }
 
     /// mutable fetch — GOVERNOR: `emergence.rs::advect_batch`
     pub fn get_mut(&mut self, h: EntityHandle) -> Option<&mut Tensor6> {
         if h.tag != self.kind as u32 {
-                return None;
-            }
+            return None;
+        }
         self.tensors.get_mut(h.idx as usize)
     }
 }
@@ -300,7 +307,12 @@ pub struct FieldDSL {
 
 impl FieldDSL {
     pub fn new(nx: u32, ny: u32, nz: u32) -> Self {
-        Self { dims: (nx, ny, nz), stride_x: 1, stride_y: nx, stride_z: nx * ny }
+        Self {
+            dims: (nx, ny, nz),
+            stride_x: 1,
+            stride_y: nx,
+            stride_z: nx * ny,
+        }
     }
 
     /// 1D flat index with boundary clamp.
@@ -320,14 +332,23 @@ impl FieldDSL {
     pub fn neighborhood_sum(
         &self,
         buf: &[Tensor6],
-        cx: i32, cy: i32, cz: i32,
+        cx: i32,
+        cy: i32,
+        cz: i32,
         channel: fn(&Tensor6) -> f32,
         weights: &[f32; 6],
     ) -> f32 {
         let mut s = 0.0;
-        let dirs: [(i32,i32,i32); 6] = [(1,0,0),(-1,0,0),(0,1,0),(0,-1,0),(0,0,1),(0,0,-1)];
-        for (k, (dx,dy,dz)) in dirs.iter().enumerate() {
-            let t = &buf[self.idx(cx+dx, cy+dy, cz+dz)];
+        let dirs: [(i32, i32, i32); 6] = [
+            (1, 0, 0),
+            (-1, 0, 0),
+            (0, 1, 0),
+            (0, -1, 0),
+            (0, 0, 1),
+            (0, 0, -1),
+        ];
+        for (k, (dx, dy, dz)) in dirs.iter().enumerate() {
+            let t = &buf[self.idx(cx + dx, cy + dy, cz + dz)];
             s += channel(t) * weights[k];
         }
         s
@@ -342,7 +363,7 @@ impl FieldDSL {
         op: TopoOp,
         read: fn(&Tensor6) -> f32,
         write: fn(&mut Tensor6, f32),
-        radius: u32,
+        _radius: u32,
     ) {
         let (nx, ny, nz) = self.dims;
         for z in 0..nz {
@@ -351,19 +372,19 @@ impl FieldDSL {
                     let i = self.idx(x as i32, y as i32, z as i32);
                     let v = match op {
                         TopoOp::Gradient => {
-                            let l = read(&src[self.idx(x as i32-1, y as i32, z as i32)]);
-                            let r = read(&src[self.idx(x as i32+1, y as i32, z as i32)]);
+                            let l = read(&src[self.idx(x as i32 - 1, y as i32, z as i32)]);
+                            let r = read(&src[self.idx(x as i32 + 1, y as i32, z as i32)]);
                             (r - l) * 0.5
                         }
                         TopoOp::Laplacian => {
                             let c = read(&src[i]);
-                            let l = read(&src[self.idx(x as i32-1, y as i32, z as i32)]);
-                            let r = read(&src[self.idx(x as i32+1, y as i32, z as i32)]);
-                            let d = read(&src[self.idx(x as i32, y as i32-1, z as i32)]);
-                            let u = read(&src[self.idx(x as i32, y as i32+1, z as i32)]);
-                            let f = read(&src[self.idx(x as i32, y as i32, z as i32-1)]);
-                            let b = read(&src[self.idx(x as i32, y as i32, z as i32+1)]);
-                            (l + r + d + u + f + b - 6.0 * c)
+                            let l = read(&src[self.idx(x as i32 - 1, y as i32, z as i32)]);
+                            let r = read(&src[self.idx(x as i32 + 1, y as i32, z as i32)]);
+                            let d = read(&src[self.idx(x as i32, y as i32 - 1, z as i32)]);
+                            let u = read(&src[self.idx(x as i32, y as i32 + 1, z as i32)]);
+                            let f = read(&src[self.idx(x as i32, y as i32, z as i32 - 1)]);
+                            let b = read(&src[self.idx(x as i32, y as i32, z as i32 + 1)]);
+                            l + r + d + u + f + b - 6.0 * c
                         }
                         _ => read(&src[i]),
                     };
@@ -391,8 +412,8 @@ mod tests {
     #[test]
     fn dsl_idx_inside_bounds() {
         let dsl = FieldDSL::new(4, 4, 4);
-        assert_eq!(dsl.idx(0,0,0), 0);
-        assert_eq!(dsl.idx(3,3,3), 63);
+        assert_eq!(dsl.idx(0, 0, 0), 0);
+        assert_eq!(dsl.idx(3, 3, 3), 63);
         assert_eq!(dsl.idx(-1, 0, 0), 0); // clamp
     }
 

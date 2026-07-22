@@ -23,7 +23,9 @@ pub enum PillarId {
 impl PillarId {
     pub const COUNT: usize = 5;
 
-    pub fn as_usize(self) -> usize { self as usize }
+    pub fn as_usize(self) -> usize {
+        self as usize
+    }
 
     pub fn validate_order(seq: &[Self]) -> bool {
         seq.windows(2).all(|w| (w[0] as u32) <= (w[1] as u32))

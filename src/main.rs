@@ -2,13 +2,9 @@
 // AETHERION-CONTINUUM — Entry Point
 // ═══════════════════════════════════════════════════════════════
 
-pub mod field;
-pub mod emergence_utils;
-pub mod emergence;
-mod pipeline;
-mod dsl;
-mod proof;
-mod bridge;
+use aetherion_continuum::dsl;
+use aetherion_continuum::pipeline;
+use aetherion_continuum::proof;
 
 use std::env;
 
@@ -48,9 +44,12 @@ fn main() {
         let bundle: proof::conservation_proof::ProofBundle =
             serde_json::from_str(&data).expect("Invalid proof format");
         match proof::conservation_proof::ProofChain::verify_chain(&bundle.chain) {
-            Ok(true) => println!("Proof chain VALID — {} frames, {} corrections, invariance {:.1}%",
-                bundle.metadata.total_frames, bundle.metadata.total_corrections,
-                bundle.metadata.invariance_ratio * 100.0),
+            Ok(true) => println!(
+                "Proof chain VALID — {} frames, {} corrections, invariance {:.1}%",
+                bundle.metadata.total_frames,
+                bundle.metadata.total_corrections,
+                bundle.metadata.invariance_ratio * 100.0
+            ),
             Ok(false) => println!("Proof chain INVALID"),
             Err(e) => eprintln!("Verification error: {}", e),
         }

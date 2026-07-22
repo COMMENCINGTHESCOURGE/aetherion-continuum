@@ -18,10 +18,10 @@ pub struct ExportManifest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum AssetType {
-    MeshletCluster,          // Nanite-compatible meshlet export
-    HeightField,             // Blender Geometry Nodes heightmap
-    FieldTensor,             // Raw 6D field data for UE5 Field Asset
-    SparseOctree,            // Octree structure for external engines
+    MeshletCluster, // Nanite-compatible meshlet export
+    HeightField,    // Blender Geometry Nodes heightmap
+    FieldTensor,    // Raw 6D field data for UE5 Field Asset
+    SparseOctree,   // Octree structure for external engines
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,17 +57,50 @@ impl ExportManifest {
             engine: "Unreal Engine 5".into(),
             version: "5.4+".into(),
             asset_type: AssetType::MeshletCluster,
-            bounds: BoundingBox { min: [0.0; 3], max: [16384.0; 3] },
+            bounds: BoundingBox {
+                min: [0.0; 3],
+                max: [16384.0; 3],
+            },
             lod_levels: vec![
-                LodLevel { detail: 0.0, meshlet_count: 128, triangle_count: 8192, byte_offset: 0, byte_size: 0 },
-                LodLevel { detail: 0.5, meshlet_count: 2048, triangle_count: 131072, byte_offset: 0, byte_size: 0 },
-                LodLevel { detail: 1.0, meshlet_count: 32768, triangle_count: 2097152, byte_offset: 0, byte_size: 0 },
+                LodLevel {
+                    detail: 0.0,
+                    meshlet_count: 128,
+                    triangle_count: 8192,
+                    byte_offset: 0,
+                    byte_size: 0,
+                },
+                LodLevel {
+                    detail: 0.5,
+                    meshlet_count: 2048,
+                    triangle_count: 131072,
+                    byte_offset: 0,
+                    byte_size: 0,
+                },
+                LodLevel {
+                    detail: 1.0,
+                    meshlet_count: 32768,
+                    triangle_count: 2097152,
+                    byte_offset: 0,
+                    byte_size: 0,
+                },
             ],
             material_mapping: MaterialMapping {
                 field_channels: vec![
-                    FieldChannelMapping { channel_name: "density".into(), target_material_param: "BaseColor".into(), range: [0.0, 1.0] },
-                    FieldChannelMapping { channel_name: "cohesion".into(), target_material_param: "Roughness".into(), range: [0.0, 1.0] },
-                    FieldChannelMapping { channel_name: "moisture".into(), target_material_param: "Specular".into(), range: [0.0, 1.0] },
+                    FieldChannelMapping {
+                        channel_name: "density".into(),
+                        target_material_param: "BaseColor".into(),
+                        range: [0.0, 1.0],
+                    },
+                    FieldChannelMapping {
+                        channel_name: "cohesion".into(),
+                        target_material_param: "Roughness".into(),
+                        range: [0.0, 1.0],
+                    },
+                    FieldChannelMapping {
+                        channel_name: "moisture".into(),
+                        target_material_param: "Specular".into(),
+                        range: [0.0, 1.0],
+                    },
                 ],
             },
         }
@@ -105,8 +138,9 @@ mod tests {
                 "field_channels": []
             }
         }"#;
-        
-        let manifest: ExportManifest = serde_json::from_str(json_data).expect("Failed to deserialize manifest");
+
+        let manifest: ExportManifest =
+            serde_json::from_str(json_data).expect("Failed to deserialize manifest");
         assert_eq!(manifest.engine, "Custom Engine");
         assert!(matches!(manifest.asset_type, AssetType::FieldTensor));
     }

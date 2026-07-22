@@ -1,6 +1,6 @@
-use wasm_bindgen::prelude::*;
+use crate::pipeline::zero_sync_dispatch::{ShaderModules, ZeroSyncDispatch};
 use std::sync::Arc;
-use crate::pipeline::zero_sync_dispatch::{ZeroSyncDispatch, ShaderModules};
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct AetherionEngine {
@@ -12,7 +12,7 @@ impl AetherionEngine {
     #[wasm_bindgen(constructor)]
     pub async fn new() -> Result<AetherionEngine, JsValue> {
         console_error_panic_hook::set_once();
-        
+
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::default());
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -30,7 +30,7 @@ impl AetherionEngine {
                     required_features: wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
                         | wgpu::Features::INDIRECT_FIRST_INSTANCE,
                     required_limits: wgpu::Limits {
-                        max_storage_buffer_binding_size: 1 << 29, 
+                        max_storage_buffer_binding_size: 1 << 29,
                         max_compute_workgroup_storage_size: 16384,
                         ..wgpu::Limits::downlevel_defaults()
                     },
@@ -74,15 +74,16 @@ impl AetherionEngine {
 
         let engine = ZeroSyncDispatch::new(device.clone(), queue, &shaders);
 
-        Ok(AetherionEngine {
-            engine,
-        })
+        Ok(AetherionEngine { engine })
     }
 
     pub fn tick(&mut self) {
-        let mut encoder = self.engine.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("frame_encoder"),
-        });
+        let mut encoder =
+            self.engine
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("frame_encoder"),
+                });
         self.engine.dispatch_frame(&mut encoder);
         self.engine.queue.submit(Some(encoder.finish()));
     }
