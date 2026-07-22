@@ -10,6 +10,8 @@ pub trait Pillar {
     fn execute(&self, out: &mut [Tensor6], inp: &[Tensor6]);
 }
 
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PillarId {
     FieldIngestion = 0u32,
     ContinuityResolution = 1u32,

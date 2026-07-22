@@ -2,6 +2,9 @@
 // AETHERION-CONTINUUM — Entry Point
 // ═══════════════════════════════════════════════════════════════
 
+pub mod field;
+pub mod emergence_utils;
+pub mod emergence;
 mod pipeline;
 mod dsl;
 mod proof;

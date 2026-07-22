@@ -641,6 +641,13 @@ impl ZeroSyncDispatch {
         Ok(())
     }
 
+    /// Submit a finished command encoder to the GPU queue.
+    /// Consumes the encoder to avoid borrow conflicts with dispatch_frame(&mut self).
+    pub fn submit_frame(&self, encoder: CommandEncoder) {
+        self.queue.submit(Some(encoder.finish()));
+        self.device.poll(wgpu::Maintain::Wait);
+    }
+
     pub fn load_landscape_payload(&self, data: &[f32]) {
         // Write the raw 32-bit float topology data to the storage buffer
         self.queue.write_buffer(&self.field_buffer, 0, bytemuck::cast_slice(data));
@@ -729,8 +736,7 @@ pub async fn run() {
             label: Some("frame_encoder"),
         });
         engine.dispatch_frame(&mut encoder);
-        engine.queue.submit(Some(encoder.finish()));
-        device.poll(wgpu::Maintain::Wait);
+        engine.submit_frame(encoder);
     }
 }
 
