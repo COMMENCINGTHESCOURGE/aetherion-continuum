@@ -7,7 +7,7 @@
 //   @4 storage read_write indirect_dispatch
 
 struct SparseNode {
-    morton_code: u64,
+    morton_code: u32,
     child_mask: u32,
     field_offset: u32,
     parent_idx: u32,
@@ -107,7 +107,7 @@ fn sparse_stream_activate(@builtin(global_invocation_id) gid: vec3<u32>) {
             hash_table[entry_idx].next = 0u;
             
             // Initialize sparse node
-            nodes[idx].morton_code = u64(hash);
+            nodes[idx].morton_code = hash;
             nodes[idx].child_mask = 0u;
             nodes[idx].field_offset = idx * 64u; // offset into field buffer
             nodes[idx].parent_idx = 0u;
@@ -123,8 +123,8 @@ fn sparse_stream_activate(@builtin(global_invocation_id) gid: vec3<u32>) {
 
 @compute @workgroup_size(1)
 fn build_indirect_dispatch(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let active = atomicLoad(&active_count);
-    let groups = (active + 63u) / 64u;
+    let active_nodes = atomicLoad(&active_count);
+    let groups = (active_nodes + 63u) / 64u;
     
     indirect_dispatch = IndirectDispatch(
         max(1u, groups),

@@ -281,29 +281,31 @@ async function init() {
     ]
   });
 
-  // sparse_stream: @group(0) bindings 0-2
+  // sparse_stream: @group(0) bindings 0-4 (matches core/sparse_stream.wgsl)
   const sparseBGL = device.createBindGroupLayout({
     entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
     ]
   });
 
   // === COMPUTE PIPELINES ===
-  const fieldPipeline = device.createComputePipeline({
+  const fieldPipeline = device.createComputePipeline({ label: 'field',
     layout: device.createPipelineLayout({ bindGroupLayouts: [fieldBGL] }),
     compute: { module: fieldModule, entryPoint: 'field_tensor_update' },
   });
 
-  const enforcePipeline = device.createComputePipeline({
+  const enforcePipeline = device.createComputePipeline({ label: 'enforce',
     layout: device.createPipelineLayout({ bindGroupLayouts: [conservationBGL] }),
     compute: { module: conservationModule, entryPoint: 'enforce_conservation' },
   });
 
-  const globalPipeline = device.createComputePipeline({
+  const globalPipeline = device.createComputePipeline({ label: 'global',
     layout: device.createPipelineLayout({ bindGroupLayouts: [conservationBGL] }),
-    compute: { module: conservationModule, entryPoint: 'global_correction_pass_vinculum' },
+    compute: { module: conservationModule, entryPoint: 'global_correction_pass' },
   });
 
   // === BIND GROUPS ===
@@ -330,30 +332,35 @@ async function init() {
     ]
   });
 
-  // Sparse stream bind group (placeholder — not dispatched yet)
-  const sparseKeysBuffer = device.createBuffer({
-    size: 1024 * 8,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const sparseCountsBuffer = device.createBuffer({
-    size: 1024 * 4,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  const sparseHeaderBuffer = device.createBuffer({
-    size: 16,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
+  // Sparse stream buffers (structs match core/sparse_stream.wgsl)
+  const SPARSE_NODE_STRIDE = 32;
+  const HASH_ENTRY_STRIDE = 12;
+  const sparseNodesBuffer = device.createBuffer({ size: 65536 * SPARSE_NODE_STRIDE, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const sparseHashBuffer = device.createBuffer({ size: 1024 * HASH_ENTRY_STRIDE, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const streamReqBuffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  const sparseActiveBuffer = device.createBuffer({ size: 4, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const indirectDispatchBuffer = device.createBuffer({ size: 12, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+  const reqData = new Float32Array(16);
+  reqData[4] = 1.0; reqData[5] = 1.0; reqData[6] = 1.0;
+  reqData[8] = 0.25;
+  reqData[9] = 1.0;
+  device.queue.writeBuffer(streamReqBuffer, 0, reqData);
+  device.queue.writeBuffer(sparseActiveBuffer, 0, new Uint32Array([0]));
+  device.queue.writeBuffer(indirectDispatchBuffer, 0, new Uint32Array([1, 1, 1]));
   const sparseBG = device.createBindGroup({
     layout: sparseBGL,
     entries: [
-      { binding: 0, resource: { buffer: sparseKeysBuffer } },
-      { binding: 1, resource: { buffer: sparseCountsBuffer } },
-      { binding: 2, resource: { buffer: sparseHeaderBuffer } },
+      { binding: 0, resource: { buffer: sparseNodesBuffer } },
+      { binding: 1, resource: { buffer: sparseHashBuffer } },
+      { binding: 2, resource: { buffer: streamReqBuffer } },
+      { binding: 3, resource: { buffer: sparseActiveBuffer } },
+      { binding: 4, resource: { buffer: indirectDispatchBuffer } },
     ]
   });
-  const sparsePipeline = device.createComputePipeline({
+
+  const sparsePipeline = device.createComputePipeline({ label: 'sparse',
     layout: device.createPipelineLayout({ bindGroupLayouts: [sparseBGL] }),
-    compute: { module: sparseModule, entryPoint: 'histogram_pass' },
+    compute: { module: sparseModule, entryPoint: 'sparse_stream_activate' },
   });
 
   log('Compute pipelines created — 3 entry points', 'ok');

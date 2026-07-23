@@ -41,15 +41,15 @@ const COHESION_SOLID_FLOOR: f32 = 0.15;
 // ═══ VINCULUM FUNCTIONS ═══
 
 fn mod9Classify(ratio: f32) -> u32 {
-    if !isFinite(ratio) { return 0u; }
-    let mod = u32(abs(round(ratio * 100.0))) % 9u;
-    return mod;
+    if (bitcast<u32>(ratio) & 0x7f800000u) == 0x7f800000u { return 0u; } // !finite (inf/NaN)
+    let modc = u32(abs(round(ratio * 100.0))) % 9u;
+    return modc;
 }
 
 fn vinculumRatioClassify(ratio: f32) -> u32 {
-    let mod = mod9Classify(ratio);
-    if mod == 1u || mod == 4u || mod == 7u { return 1u; }  // STABLE
-    if mod == 0u || mod == 3u || mod == 6u { return 2u; }  // BREACH
+    let modc = mod9Classify(ratio);
+    if modc == 1u || modc == 4u || modc == 7u { return 1u; }  // STABLE
+    if modc == 0u || modc == 3u || modc == 6u { return 2u; }  // BREACH
     return 3u;  // NEUTRAL
 }
 

@@ -47,7 +47,7 @@ const CELLS_PER_TILE: u32 = 4096u;
 
 @group(0) @binding(0) var<storage, read_write> field: array<vec4<f32>>;
 @group(0) @binding(1) var<storage, read_write> state: ConservationState;
-@group(0) @binding(2) var<uniform> meta: DispatchMeta;
+@group(0) @binding(2) var<uniform> meta_: DispatchMeta;
 @group(0) @binding(3) var<storage, read> phase_diagram: array<vec4<f32>>;
 @group(0) @binding(4) var<storage, read_write> gradient: array<vec4<f32>>;
 
@@ -99,7 +99,7 @@ fn compute_divergence(cell: vec4<f32>, grad: vec4<f32>, neighbors: array<vec4<f3
 @compute @workgroup_size(8, 8, 1)
 fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cell_idx = gid.x + gid.y * 64u + gid.z * 4096u;
-    let total_cells = meta.tile_count * meta.cells_per_tile;
+    let total_cells = meta_.tile_count * meta_.cells_per_tile;
     if cell_idx >= total_cells { return; }
 
     var cell = field[cell_idx];
