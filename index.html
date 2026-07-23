@@ -99,14 +99,25 @@ async function init() {
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adapter) { log('No GPU adapter found', 'err'); return; }
 
-  const device = await adapter.requestDevice({
-    requiredFeatures: ['timestamp-query'],
-    requiredLimits: {
-      maxStorageBufferBindingSize: 1 << 30,
-      maxComputeWorkgroupStorageSize: 32768,
-      maxComputeWorkgroupsPerDimension: 65535,
+  // Tiered request: full -> no timestamp-query -> bare defaults
+  let device, hasTimestamp = false;
+  const wantLimits = {
+    maxStorageBufferBindingSize: Math.min(1 << 30, adapter.limits.maxStorageBufferBindingSize),
+    maxComputeWorkgroupStorageSize: Math.min(32768, adapter.limits.maxComputeWorkgroupStorageSize),
+    maxComputeWorkgroupsPerDimension: 65535,
+  };
+  try {
+    device = await adapter.requestDevice({ requiredFeatures: ['timestamp-query'], requiredLimits: wantLimits });
+    hasTimestamp = true;
+  } catch (e) {
+    try {
+      device = await adapter.requestDevice({ requiredLimits: wantLimits });
+      log('timestamp-query unavailable - GPU timing disabled', 'warn');
+    } catch (e2) {
+      device = await adapter.requestDevice();
+      log('default limits in use - reduced feature set', 'warn');
     }
-  });
+  }
 
   log(`GPU: ${adapter.info.device} | ${adapter.info.vendor}`, 'ok');
     log(`Cells: ${TOTAL_CELLS.toLocaleString()} (${GRID}³) | VRAM: ${((FIELD_SIZE*2+PHASE_DIAGRAM_SIZE+CORRECTION_LOG_SIZE)/1048576).toFixed(1)}MB`, 'ok');
@@ -346,21 +357,15 @@ async function init() {
   });
 
   log('Compute pipelines created — 3 entry points', 'ok');
-  // === MT2: Timestamp query set ===
-  const TIMESTAMP_SLOTS = 10; // 2 per pass × 5 passes
-  const timestampQuerySet = device.createQuerySet({
-    type: 'timestamp',
-    count: TIMESTAMP_SLOTS,
-  });
-  const timestampBuffer = device.createBuffer({
-    size: TIMESTAMP_SLOTS * 8, // uint64 per timestamp
-    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
-  });
-  const timestampReadBuffer = device.createBuffer({
-    size: TIMESTAMP_SLOTS * 8,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  });
-  const timestampPeriod = 1_000_000 / (80_000_000); // ~12.5ns on modern GPU, convert to μs
+  // === MT2: Timestamp query set (optional) ===
+  const TIMESTAMP_SLOTS = 10;
+  let timestampQuerySet = null, timestampBuffer = null, timestampReadBuffer = null;
+  if (hasTimestamp) {
+    timestampQuerySet = device.createQuerySet({ type: 'timestamp', count: TIMESTAMP_SLOTS });
+    timestampBuffer = device.createBuffer({ size: TIMESTAMP_SLOTS * 8, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+    timestampReadBuffer = device.createBuffer({ size: TIMESTAMP_SLOTS * 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+  }
+  const timestampPeriod = 1_000_000 / (80_000_000);
 
 
   // === HUD UPDATES ===
@@ -423,7 +428,7 @@ async function init() {
     return count;
   }
 
-  function frameLoop() {
+  async function frameLoop() {
     requestAnimationFrame(frameLoop);
     frame++;
 
@@ -436,7 +441,7 @@ async function init() {
 
     // 1. Field tensor update
     {
-      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } });
+      const pass = encoder.beginComputePass(hasTimestamp ? { timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 0, endOfPassWriteIndex: 1 } } : {});
       pass.setPipeline(fieldPipeline);
       pass.setBindGroup(0, fieldBG);
       pass.dispatchWorkgroups(
@@ -453,7 +458,7 @@ async function init() {
 
     // 3. Conservation enforce
     {
-      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 } });
+      const pass = encoder.beginComputePass(hasTimestamp ? { timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 2, endOfPassWriteIndex: 3 } } : {});
       pass.setPipeline(enforcePipeline);
       pass.setBindGroup(0, conservationBG);
       pass.dispatchWorkgroups(Math.ceil(TOTAL_CELLS / 64));
@@ -462,7 +467,7 @@ async function init() {
 
     // 4. Global correction
     {
-      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 4, endOfPassWriteIndex: 5 } });
+      const pass = encoder.beginComputePass(hasTimestamp ? { timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 4, endOfPassWriteIndex: 5 } } : {});
       pass.setPipeline(globalPipeline);
       pass.setBindGroup(0, conservationBG);
       pass.dispatchWorkgroups(1);
@@ -471,7 +476,7 @@ async function init() {
 
     // 5. Sparse stream histogram
     {
-      const pass = encoder.beginComputePass({ timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 6, endOfPassWriteIndex: 7 } });
+      const pass = encoder.beginComputePass(hasTimestamp ? { timestampWrites: { querySet: timestampQuerySet, beginningOfPassWriteIndex: 6, endOfPassWriteIndex: 7 } } : {});
       pass.setPipeline(sparsePipeline);
       pass.setBindGroup(0, sparseBG);
       pass.dispatchWorkgroups(16);
@@ -479,8 +484,8 @@ async function init() {
     }
 
     // Resolve timestamps
-    encoder.resolveQuerySet(timestampQuerySet, 0, TIMESTAMP_SLOTS, timestampBuffer, 0);
-    encoder.copyBufferToBuffer(timestampBuffer, 0, timestampReadBuffer, 0, TIMESTAMP_SLOTS * 8);
+    if (hasTimestamp) encoder.resolveQuerySet(timestampQuerySet, 0, TIMESTAMP_SLOTS, timestampBuffer, 0);
+    if (hasTimestamp) encoder.copyBufferToBuffer(timestampBuffer, 0, timestampReadBuffer, 0, TIMESTAMP_SLOTS * 8);
 
     device.queue.submit([encoder.finish()]);
 
@@ -490,7 +495,7 @@ async function init() {
     // === METRICS (every 30 frames to avoid mapAsync backpressure) ===
 
       // GPU timestamp readback (every 60 frames)
-      if (frame % 60 === 0) {
+      if (hasTimestamp && frame % 60 === 0) {
         try {
           await timestampReadBuffer.mapAsync(GPUMapMode.READ);
           const timestamps = new BigInt64Array(timestampReadBuffer.getMappedRange());
