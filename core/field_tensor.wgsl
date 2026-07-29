@@ -3,11 +3,13 @@
 //   all shaders share this layout — no struct size mismatches.
 
 struct ConservationState {
-    mass_drift: f32,
-    energy_drift: f32,
-    momentum_drift: vec3<f32>,
-    total_mass: f32,
-    total_energy: f32,
+    mass_drift_fixed: atomic<i32>,
+    total_mass_fixed: atomic<u32>,
+    energy_drift_fixed: atomic<i32>,
+    total_energy_fixed: atomic<u32>,
+    momentum_drift_x: atomic<i32>,
+    momentum_drift_y: atomic<i32>,
+    momentum_drift_z: atomic<i32>,
 };
 
 struct DispatchMeta {
@@ -16,6 +18,9 @@ struct DispatchMeta {
     active_mask: u32,
     thermal_limit_pct: f32,
     vram_pressure_pct: f32,
+    grid_size_x: u32,
+    grid_size_y: u32,
+    grid_size_z: u32,
 };
 
 // ═══ VINCULUM BARS ═══
@@ -41,7 +46,7 @@ const FG_OVERHEAT_BAR: f32 = 2.0;
 
 const DT: f32 = 0.016;
 
-const CELLS_PER_TILE: u32 = 4096u;
+const MASS_DRIFT_SCALE: f32 = 1000.0; // fixed-point scale for atomic accumulation
 
 // ═══ BINDINGS ═══
 
@@ -87,18 +92,38 @@ fn phase_transition(cell: ptr<function, vec4<f32>>, grad: ptr<function, vec4<f32
 
 fn compute_divergence(cell: vec4<f32>, grad: vec4<f32>, neighbors: array<vec4<f32>, 6>, neighbor_grads: array<vec4<f32>, 6>) -> f32 {
     var div: f32 = 0.0;
+    // neighbors order: +x, -x, +y, -y, +z, -z
     div += neighbors[0].x * neighbor_grads[0].x - neighbors[1].x * neighbor_grads[1].x;
     div += neighbors[2].x * neighbor_grads[2].y - neighbors[3].x * neighbor_grads[3].y;
     div += neighbors[4].x * neighbor_grads[4].z - neighbors[5].x * neighbor_grads[5].z;
     div *= 1.0 + cell.z * PSI_DIVERGENCE_BAR;
-    return abs(div);
+    return div; // signed divergence (not abs) — accumulate sign-aware
+}
+
+// Helper: atomic add with saturation for atomic<i32>
+fn atomicAddSaturating(ptr: ptr<storage, atomic<i32>>, delta: i32) {
+    // clamp to safe bounds to avoid overflow; use 31-bit range to be conservative
+    let MIN_I: i32 = -2147483647;
+    let MAX_I: i32 = 2147483647;
+    loop {
+        let old = atomicLoad(ptr);
+        let sum = old + delta;
+        let clamped = clamp(sum, MIN_I, MAX_I);
+        let res = atomicCompareExchangeWeak(ptr, old, clamped);
+        if (res.exchanged) { break; }
+    }
 }
 
 // ═══ MAIN KERNEL ═══
 
 @compute @workgroup_size(8, 8, 1)
 fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
-    let cell_idx = gid.x + gid.y * 64u + gid.z * 4096u;
+    let sizeX = meta_.grid_size_x;
+    let sizeY = meta_.grid_size_y;
+    let sizeZ = meta_.grid_size_z;
+
+    let plane = sizeX * sizeY;
+    let cell_idx = gid.x + gid.y * sizeX + gid.z * plane;
     let total_cells = meta_.tile_count * meta_.cells_per_tile;
     if cell_idx >= total_cells { return; }
 
@@ -110,27 +135,41 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
     let psi = cell.z;
     let psi_coupling = psi * PSI_COUPLING_BAR;
     if psi_coupling > PSI_THRESHOLD {
-        let nx = (gid.x + 1u) % 64u;
-        let px = (gid.x + 63u) % 64u;
-        let ny = (gid.y + 1u) % 64u;
-        let py = (gid.y + 63u) % 64u;
+        // compute neighbor indices with wrap-around
+        let nx = (gid.x + 1u) % sizeX;
+        let px = (gid.x + (sizeX - 1u)) % sizeX;
+        let ny = (gid.y + 1u) % sizeY;
+        let py = (gid.y + (sizeY - 1u)) % sizeY;
+        let nz = (gid.z + 1u) % sizeZ;
+        let pz = (gid.z + (sizeZ - 1u)) % sizeZ;
 
-        let n_idx = nx + gid.y * 64u + gid.z * 4096u;
-        let p_idx = px + gid.y * 64u + gid.z * 4096u;
-        let n_y_idx = gid.x + ny * 64u + gid.z * 4096u;
-        let p_y_idx = gid.x + py * 64u + gid.z * 4096u;
+        let idx_px = px + gid.y * sizeX + gid.z * plane;
+        let idx_nx = nx + gid.y * sizeX + gid.z * plane;
+        let idx_py = gid.x + py * sizeX + gid.z * plane;
+        let idx_ny = gid.x + ny * sizeX + gid.z * plane;
+        let idx_pz = gid.x + gid.y * sizeX + pz * plane;
+        let idx_nz = gid.x + gid.y * sizeX + nz * plane;
 
-        // Preload all neighbor values BEFORE any write to prevent load-after-store hazard
-        let nbr_rho_n = field[n_idx].x;
-        let nbr_rho_p = field[p_idx].x;
-        let nbr_rho_ny = field[n_y_idx].x;
-        let nbr_rho_py = field[p_y_idx].x;
-        let nbr_phi_n = field[n_idx].y;
-        let nbr_phi_p = field[p_idx].y;
+        // Preload neighbor values BEFORE any write to prevent load-after-store hazard
+        let nbr_rho_px = field[idx_px].x;
+        let nbr_rho_nx = field[idx_nx].x;
+        let nbr_rho_py = field[idx_py].x;
+        let nbr_rho_ny = field[idx_ny].x;
+        let nbr_rho_pz = field[idx_pz].x;
+        let nbr_rho_nz = field[idx_nz].x;
 
-        let neighbor_rho = (nbr_rho_n + nbr_rho_p + nbr_rho_ny + nbr_rho_py) * PSI_COUPLING_BAR;
+        let nbr_phi_px = field[idx_px].y;
+        let nbr_phi_nx = field[idx_nx].y;
+        let nbr_phi_py = field[idx_py].y;
+        let nbr_phi_ny = field[idx_ny].y;
+        let nbr_phi_pz = field[idx_pz].y;
+        let nbr_phi_nz = field[idx_nz].y;
+
+        let neighbor_rho = (nbr_rho_nx + nbr_rho_px + nbr_rho_ny + nbr_rho_py + nbr_rho_nz + nbr_rho_pz) * (PSI_COUPLING_BAR / 6.0);
         cell.x = mix(cell.x, neighbor_rho, psi_coupling);
-        cell.y = mix(cell.y, (nbr_phi_n + nbr_phi_p) * 0.5, psi_coupling);
+
+        let neighbor_phi = (nbr_phi_nx + nbr_phi_px + nbr_phi_ny + nbr_phi_py + nbr_phi_nz + nbr_phi_pz) / 6.0;
+        cell.y = mix(cell.y, neighbor_phi, psi_coupling);
     }
 
     if cell.w > HARDEN_START {
@@ -145,14 +184,44 @@ fn field_tensor_update(@builtin(global_invocation_id) gid: vec3<u32>) {
     field[cell_idx] = cell;
     gradient[cell_idx] = grad;
 
-    // Accumulate divergence into state buffer
-    let nx = (gid.x + 1u) % 64u; let px = (gid.x + 63u) % 64u;
-    let ny = (gid.y + 1u) % 64u; let py = (gid.y + 63u) % 64u;
-    let n_idx_xp = nx + gid.y * 64u + gid.z * 4096u;
-    let n_idx_xm = px + gid.y * 64u + gid.z * 4096u;
-    let n_idx_yp = gid.x + ny * 64u + gid.z * 4096u;
-    let n_idx_ym = gid.x + py * 64u + gid.z * 4096u;
-    let div = abs(field[n_idx_xp].x - field[n_idx_xm].x +
-                  field[n_idx_yp].x - field[n_idx_ym].x) * cell.z;
-    state.mass_drift += div;
+    // Accumulate signed divergence into state buffer using fixed-point atomic<i32>
+    // gather neighbor grad/rho for divergence computation
+    var neighbors: array<vec4<f32>, 6>;
+    var neighbor_grads: array<vec4<f32>, 6>;
+
+    // +x, -x
+    let nx2 = (gid.x + 1u) % sizeX;
+    let px2 = (gid.x + (sizeX - 1u)) % sizeX;
+    let idx_xp = nx2 + gid.y * sizeX + gid.z * plane;
+    let idx_xm = px2 + gid.y * sizeX + gid.z * plane;
+    neighbors[0] = field[idx_xp];
+    neighbors[1] = field[idx_xm];
+    neighbor_grads[0] = gradient[idx_xp];
+    neighbor_grads[1] = gradient[idx_xm];
+
+    // +y, -y
+    let ny2 = (gid.y + 1u) % sizeY;
+    let py2 = (gid.y + (sizeY - 1u)) % sizeY;
+    let idx_yp = gid.x + ny2 * sizeX + gid.z * plane;
+    let idx_ym = gid.x + py2 * sizeX + gid.z * plane;
+    neighbors[2] = field[idx_yp];
+    neighbors[3] = field[idx_ym];
+    neighbor_grads[2] = gradient[idx_yp];
+    neighbor_grads[3] = gradient[idx_ym];
+
+    // +z, -z
+    let nz2 = (gid.z + 1u) % sizeZ;
+    let pz2 = (gid.z + (sizeZ - 1u)) % sizeZ;
+    let idx_zp = gid.x + gid.y * sizeX + nz2 * plane;
+    let idx_zm = gid.x + gid.y * sizeX + pz2 * plane;
+    neighbors[4] = field[idx_zp];
+    neighbors[5] = field[idx_zm];
+    neighbor_grads[4] = gradient[idx_zp];
+    neighbor_grads[5] = gradient[idx_zm];
+
+    let div = compute_divergence(cell, grad, neighbors, neighbor_grads);
+
+    // convert to fixed-point and atomically accumulate (signed)
+    let driftFixed: i32 = i32(round(div * MASS_DRIFT_SCALE));
+    atomicAddSaturating(&state.mass_drift_fixed, driftFixed);
 }
