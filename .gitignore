@@ -1,7 +1,0 @@
-target/
-Cargo.lock
-*.rlib
-*.rmeta
-*.log
-__pycache__/
-*.pyc
