@@ -1,0 +1,67 @@
+{
+  "counties": [
+    {
+      "id": "county_king",
+      "name": "King County",
+      "osm_relation_id": 123456,
+      "rules": {
+        "speed_limit_default": {"value": "55", "priority": 0},
+        "building_height_max": {"value": "300", "priority": 0}
+      }
+    }
+  ],
+  "cities": [
+    {
+      "id": "city_seattle",
+      "name": "Seattle",
+      "parent_id": "county_king",
+      "osm_relation_id": 234567,
+      "rules": {
+        "parking_requirement": {"value": "1_per_unit", "priority": 1},
+        "noise_curfew": {"value": "22:00-07:00", "priority": 1}
+      }
+    }
+  ],
+  "boroughs": [
+    {
+      "id": "borough_capitol_hill",
+      "name": "Capitol Hill",
+      "parent_id": "city_seattle",
+      "osm_relation_id": 345678,
+      "rules": {
+        "vehicle_type_restriction": {"value": "no_commercial", "priority": 2}
+      },
+      "community_profile": {
+        "economic_status": "Mixed",
+        "political_leaning": "Pro-Development",
+        "happiness": 0.72,
+        "density_preference": 0.8
+      },
+      "aesthetic_profile": {
+        "primary_material": "Brick",
+        "roof_style": "Pitched",
+        "greenery_density": 0.6,
+        "lot_size_multiplier": 0.8,
+        "color_palette": ["#A0522D", "#8B4513", "#CD853F"]
+      }
+    }
+  ],
+  "neighborhoods": [
+    {
+      "id": "neighborhood_pike_place",
+      "name": "Pike Place Market",
+      "parent_id": "borough_capitol_hill",
+      "osm_way_id": 456789,
+      "rules": {
+        "speed_limit": {"value": "15", "priority": 3},
+        "parking_duration": {"value": "2hr_max", "priority": 3}
+      },
+      "resource_pool": {
+        "population": 5000,
+        "tax_revenue": 250000.0,
+        "noise_index": 0.85,
+        "traffic_volume": 0.9
+      }
+    }
+  ]
+}
