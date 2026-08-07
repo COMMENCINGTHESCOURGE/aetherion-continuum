@@ -1,13 +1,23 @@
 [package]
 name = "aetherion-continuum"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Field-Native, Conservation-Enforced, Planet-Scale Simulation Engine"
+description = "Field-Native, Conservation-Enforced, Planet-Scale Simulation Engine with Administrative Hierarchy"
 license = "MIT"
 repository = "https://github.com/COMMENCINGTHESCOURGE/aetherion-continuum"
 
+[workspace]
+members = [
+    "core",
+    "parser",
+    "bridge",
+]
+
 [dependencies]
 wgpu = "22.0"
+geo = "0.28"
+rstar = "0.12"
+osmpbf = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
@@ -16,6 +26,11 @@ log = "0.4"
 env_logger = "0.11"
 bytemuck = { version = "1.16", features = ["derive"] }
 pollster = "0.3"
+nalgebra = "0.33"
+
+# GDExtension bindings (optional)
+godot = { version = "0.1", optional = true }
+gdext = { version = "0.1", optional = true }
 
 [profile.release]
 opt-level = 3
@@ -30,6 +45,10 @@ path = "src/main.rs"
 [lib]
 name = "aetherion_continuum"
 crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+godot-extension = ["godot", "gdext"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.pyo3]
 version = "0.21"

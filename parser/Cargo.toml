@@ -1,0 +1,22 @@
+[package]
+name = "aetherion-parser"
+version = "0.2.0"
+edition = "2021"
+description = "OSM boundary parser for administrative hierarchy"
+
+[dependencies]
+aetherion-core = { path = "../core" }
+osmpbf = "0.4"
+geo = "0.28"
+rstar = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+
+[lib]
+name = "aetherion_parser"
+path = "src/lib.rs"
+
+[[bin]]
+name = "parse_boundaries"
+path = "src/main.rs"
