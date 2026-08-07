@@ -2,9 +2,13 @@
 // AETHERION-CONTINUUM — Bridge: OpenCode Modular Interiors
 // Modular interior system for vehicles and structures with field-aware
 // component assembly and boolean operations
+// 
+// PHASE 2 UPDATE: Field-Aware Component System (Islamic Golden Age)
+// Democratizes field physics across all components universally
 // ═══════════════════════════════════════════════════════════════
 
 use serde::{Deserialize, Serialize};
+use crate::field::{Tensor6, Archetype};
 
 /// Modular interior component types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +82,192 @@ pub struct ComponentFieldProperties {
     pub electromagnetic_shielding: f32,
     pub structural_integrity: f32,
     pub field_coupling_strength: f32,
+}
+
+/// PHASE 2: Field-Aware Trait - Universal interface for field-reactive components
+/// Democratizes field physics access across all modules (Islamic Golden Age principle)
+pub trait FieldAware {
+    /// Query ambient field tensor at component position
+    fn query_field(&self, field_tensor: &Tensor6) -> FieldInteraction;
+    
+    /// React to field changes by modifying component state
+    fn react_to_field(&mut self, interaction: &FieldInteraction);
+    
+    /// Get component's contribution to global field
+    fn get_field_contribution(&self) -> Tensor6;
+    
+    /// Map component archetype to ECS system
+    fn archetype(&self) -> Archetype;
+}
+
+/// Field interaction result from component-field coupling
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldInteraction {
+    pub force_vector: [f32; 3],
+    pub torque_vector: [f32; 3],
+    pub energy_transfer: f32,
+    pub field_distortion: f32,
+    pub coupling_coefficient: f32,
+}
+
+impl FieldInteraction {
+    pub fn zero() -> Self {
+        Self {
+            force_vector: [0.0; 3],
+            torque_vector: [0.0; 3],
+            energy_transfer: 0.0,
+            field_distortion: 0.0,
+            coupling_coefficient: 0.0,
+        }
+    }
+}
+
+/// PHASE 2: Central registry of universal field parameters
+/// Prevents localized math assumptions - all components reference identical constants
+#[derive(Debug, Clone)]
+pub struct FieldParameterRegistry {
+    pub gravitational_constant: f32,
+    pub permittivity_free_space: f32,
+    pub permeability_free_space: f32,
+    pub speed_of_light: f32,
+    pub planck_constant: f32,
+    pub boltzmann_constant: f32,
+    pub reference_temperature: f32,
+    pub reference_density: f32,
+}
+
+impl Default for FieldParameterRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FieldParameterRegistry {
+    pub fn new() -> Self {
+        Self {
+            gravitational_constant: 6.674e-11,
+            permittivity_free_space: 8.854e-12,
+            permeability_free_space: 1.257e-6,
+            speed_of_light: 2.998e8,
+            planck_constant: 6.626e-34,
+            boltzmann_constant: 1.381e-23,
+            reference_temperature: 293.15, // 20°C in Kelvin
+            reference_density: 1.225,      // Air density at sea level kg/m³
+        }
+    }
+    
+    /// Global singleton accessor - ensures all components use identical constants
+    pub fn global() -> &'static Self {
+        static REGISTRY: FieldParameterRegistry = FieldParameterRegistry {
+            gravitational_constant: 6.674e-11,
+            permittivity_free_space: 8.854e-12,
+            permeability_free_space: 1.257e-6,
+            speed_of_light: 2.998e8,
+            planck_constant: 6.626e-34,
+            boltzmann_constant: 1.381e-23,
+            reference_temperature: 293.15,
+            reference_density: 1.225,
+        };
+        &REGISTRY
+    }
+}
+
+/// PHASE 2: Ambient field emitter - projects dynamic fields onto nearby FieldAware components
+/// Eliminates hardcoded coupling; components react based on proximity and field strength
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmbientFieldEmitter {
+    pub id: String,
+    pub position: [f32; 3],
+    pub emission_radius: f32,
+    pub field_type: FieldType,
+    pub intensity: f32,
+    pub frequency_hz: f32,
+    pub modulation: FieldModulation,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FieldType {
+    Gravitational,
+    Electromagnetic,
+    Thermal,
+    Acoustic,
+    Quantum,
+    Composite,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FieldModulation {
+    Constant,
+    Sinusoidal { amplitude: f32, phase: f32 },
+    Pulsed { duty_cycle: f32, period_ms: f32 },
+    Random { variance: f32 },
+}
+
+impl AmbientFieldEmitter {
+    pub fn new(id: &str, position: [f32; 3], field_type: FieldType, intensity: f32) -> Self {
+        Self {
+            id: id.to_string(),
+            position,
+            emission_radius: 10.0,
+            field_type,
+            intensity,
+            frequency_hz: 0.0,
+            modulation: FieldModulation::Constant,
+        }
+    }
+    
+    /// Calculate field strength at a given point with inverse-square law
+    pub fn field_strength_at(&self, point: [f32; 3]) -> f32 {
+        let dx = point[0] - self.position[0];
+        let dy = point[1] - self.position[1];
+        let dz = point[2] - self.position[2];
+        let distance_squared = dx * dx + dy * dy + dz * dz;
+        
+        if distance_squared < 0.01 {
+            return self.intensity; // Cap at close range
+        }
+        
+        if distance_squared > self.emission_radius * self.emission_radius {
+            return 0.0;
+        }
+        
+        // Inverse-square law with smooth falloff
+        self.intensity / (distance_squared + 0.1)
+    }
+    
+    /// Project field tensor onto a FieldAware component
+    pub fn project_onto(&self, component: &dyn FieldAware) -> FieldInteraction {
+        let strength = self.field_strength_at(component.query_field(&Tensor6::ZERO).force_vector);
+        
+        if strength < 1e-6 {
+            return FieldInteraction::zero();
+        }
+        
+        let direction = [
+            component.query_field(&Tensor6::ZERO).force_vector[0] - self.position[0],
+            component.query_field(&Tensor6::ZERO).force_vector[1] - self.position[1],
+            component.query_field(&Tensor6::ZERO).force_vector[2] - self.position[2],
+        ];
+        
+        let distance = (direction[0].powi(2) + direction[1].powi(2) + direction[2].powi(2)).sqrt();
+        let normalized_direction = if distance > 0.0 {
+            [direction[0] / distance, direction[1] / distance, direction[2] / distance]
+        } else {
+            [0.0, 1.0, 0.0]
+        };
+        
+        FieldInteraction {
+            force_vector: [
+                normalized_direction[0] * strength,
+                normalized_direction[1] * strength,
+                normalized_direction[2] * strength,
+            ],
+            torque_vector: [0.0; 3], // Simplified - would need component orientation
+            energy_transfer: strength * 0.1,
+            field_distortion: strength * 0.05,
+            coupling_coefficient: strength,
+        }
+    }
 }
 
 /// Boolean operation for CSG-style assembly
@@ -429,5 +619,87 @@ mod tests {
         let panel = ModularComponent::floor_panel_template("fp001", 2.0, 3.0);
         let json = panel.to_json().expect("Failed to serialize component");
         assert!(json.contains("FloorPanel"));
+    }
+
+    // PHASE 2 TESTS: Field-Aware Component System
+    
+    #[test]
+    fn test_field_parameter_registry_global() {
+        let registry = FieldParameterRegistry::global();
+        assert!((registry.gravitational_constant - 6.674e-11).abs() < 1e-15);
+        assert!((registry.speed_of_light - 2.998e8).abs() < 1e3);
+        assert!((registry.reference_temperature - 293.15).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_ambient_field_emitter_creation() {
+        let emitter = AmbientFieldEmitter::new(
+            "emitter001",
+            [0.0, 0.0, 0.0],
+            FieldType::Electromagnetic,
+            100.0,
+        );
+        assert_eq!(emitter.id, "emitter001");
+        assert_eq!(emitter.intensity, 100.0);
+        assert_eq!(emitter.emission_radius, 10.0);
+    }
+
+    #[test]
+    fn test_field_strength_inverse_square_law() {
+        let emitter = AmbientFieldEmitter::new(
+            "emitter001",
+            [0.0, 0.0, 0.0],
+            FieldType::Gravitational,
+            100.0,
+        );
+        
+        // At origin (very close), should be capped at intensity
+        let strength_at_center = emitter.field_strength_at([0.0, 0.0, 0.0]);
+        assert!((strength_at_center - 100.0).abs() < 0.01);
+        
+        // At distance 1.0, should follow inverse-square law
+        let strength_at_1m = emitter.field_strength_at([1.0, 0.0, 0.0]);
+        let expected = 100.0 / (1.0 + 0.1);
+        assert!((strength_at_1m - expected).abs() < 0.01);
+        
+        // At distance 5.0
+        let strength_at_5m = emitter.field_strength_at([5.0, 0.0, 0.0]);
+        let expected_5m = 100.0 / (25.0 + 0.1);
+        assert!((strength_at_5m - expected_5m).abs() < 0.01);
+        
+        // Beyond emission radius (10.0), should be zero
+        let strength_beyond = emitter.field_strength_at([15.0, 0.0, 0.0]);
+        assert!(strength_beyond < 1e-6);
+    }
+
+    #[test]
+    fn test_field_interaction_zero() {
+        let interaction = FieldInteraction::zero();
+        assert_eq!(interaction.force_vector, [0.0; 3]);
+        assert_eq!(interaction.torque_vector, [0.0; 3]);
+        assert!((interaction.energy_transfer - 0.0).abs() < 0.001);
+        assert!((interaction.field_distortion - 0.0).abs() < 0.001);
+        assert!((interaction.coupling_coefficient - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_field_modulation_types() {
+        let constant = FieldModulation::Constant;
+        let sinusoidal = FieldModulation::Sinusoidal { amplitude: 0.5, phase: 1.57 };
+        let pulsed = FieldModulation::Pulsed { duty_cycle: 0.3, period_ms: 100.0 };
+        let random = FieldModulation::Random { variance: 0.1 };
+        
+        // Just verify they can be constructed and differentiated
+        match constant {
+            FieldModulation::Constant => {},
+            _ => panic!("Expected Constant"),
+        }
+        match sinusoidal {
+            FieldModulation::Sinusoidal { amplitude, phase } => {
+                assert!((amplitude - 0.5).abs() < 0.001);
+                assert!((phase - 1.57).abs() < 0.001);
+            },
+            _ => panic!("Expected Sinusoidal"),
+        }
     }
 }
