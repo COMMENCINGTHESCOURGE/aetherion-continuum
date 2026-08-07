@@ -1,0 +1,81 @@
+[gd_scene load_steps=5 format=3 uid="uid://main_scene"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(50, 1, 50)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
+size = Vector3(50, 1, 50)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.3, 0.3, 0.3, 1)
+
+[node name="Main" type="Node3D"]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_ground")
+surface_material_override/0 = SubResource("StandardMaterial3D_ground")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.433013, 0.25, 0, 0.5, 0.866025, -0.5, -0.75, 0.433013, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(0.766044, 0.55667, 0.321394, -0.642788, 0.663414, 0.383022, 0, -0.5, 0.866025, 0, 15, 5)
+
+[node name="Zone" type="Area3D" parent="." groups=["zones"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0.5, -10)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Zone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+shape = SubResource("BoxShape3D_1")
+
+[node name="Vehicle" type="VehicleBody3D" parent="." groups=["vehicles"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 2, 0)
+mass = 1500
+center_of_mass_mode = VehicleBody3D.CENTER_OF_MASS_MODE_CUSTOM
+center_of_mass = Vector3(0, 0.5, 0)
+
+[node name="ChassisMesh" type="BoxMesh" parent="Vehicle"]
+size = Vector3(4, 1, 2)
+
+[node name="ChassisCollision" type="CollisionShape3D" parent="Vehicle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_1")
+
+[node name="Wheel_FL" type="VehicleWheel3D" parent="Vehicle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0.8)
+wheel_radius = 0.3
+suspension_travel = 0.1
+suspension_stiffness = 5
+use_as_steering = true
+
+[node name="Wheel_FR" type="VehicleWheel3D" parent="Vehicle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -0.8)
+wheel_radius = 0.3
+suspension_travel = 0.1
+suspension_stiffness = 5
+use_as_steering = true
+
+[node name="Wheel_RL" type="VehicleWheel3D" parent="Vehicle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0.8)
+wheel_radius = 0.3
+suspension_travel = 0.1
+suspension_stiffness = 5
+use_as_traction = true
+
+[node name="Wheel_RR" type="VehicleWheel3D" parent="Vehicle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -0.8)
+wheel_radius = 0.3
+suspension_travel = 0.1
+suspension_stiffness = 5
+use_as_traction = true
+
+[connection signal="body_entered" from="Zone" to="Zone" method="_on_body_entered"]

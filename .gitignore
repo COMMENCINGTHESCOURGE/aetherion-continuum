@@ -1,21 +1,26 @@
 ```
-# Compiled and build artifacts
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
+# Godot-specific ignores
+*.import
+*.remap
+.project
+.user
+.godot/
 
-# Dependencies
-target/
-**/target/
+# Build artifacts
+export_presets.cfg
+
+# Dependencies and cache
+.cache/
+.tmp/
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
 
 # Editors
 .vscode/
@@ -23,7 +28,7 @@ target/
 *.swp
 *.swo
 
-# Rust-specific
-Cargo.lock
-**/Cargo.lock
+# OS generated files
+.DS_Store
+Thumbs.db
 ```

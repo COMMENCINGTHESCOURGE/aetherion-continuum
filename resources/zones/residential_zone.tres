@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3 uid="uid://residential_zone"]
+
+[resource]
+zone_name = "Residential Zone"
+description = "Low-density housing areas for citizens"
+color = Color(0.2, 0.6, 0.2, 1)
+base_density = 1
+max_floors = 3
+growth_rate = 1.0
+demand_multiplier = 1.2
