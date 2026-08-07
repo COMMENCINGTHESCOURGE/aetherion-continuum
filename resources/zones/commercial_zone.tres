@@ -1,0 +1,10 @@
+[gd_resource type="Resource" load_steps=2 format=3 uid="uid://commercial_zone"]
+
+[resource]
+zone_name = "Commercial Zone"
+description = "Business districts with shops and offices"
+color = Color(0.2, 0.2, 0.8, 1)
+base_density = 2
+max_floors = 10
+growth_rate = 0.8
+demand_multiplier = 1.0

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="Engine" load_steps=2 format=3 uid="uid://electric_motor"]
+
+[script]
+script = Resource("res://scripts/vehicles/Engine.gd")
+
+[resource]
+part_name = "Electric Motor"
+mass = 150.0
+center_of_mass = Vector3(0, 0, 0)
+drag_coefficient = 0.05
+material_type = "Aluminum"
+durability = 200.0
+cost = 800
+power = 250.0
+rpm_max = 12000.0
+fuel_efficiency = 3.5
+is_electric = true

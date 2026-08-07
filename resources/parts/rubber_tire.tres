@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Wheel" load_steps=2 format=3 uid="uid://rubber_tire"]
+
+[script]
+script = Resource("res://scripts/vehicles/Wheel.gd")
+
+[resource]
+part_name = "Rubber Tire"
+mass = 25.0
+center_of_mass = Vector3(0, 0, 0)
+drag_coefficient = 0.1
+material_type = "Rubber"
+durability = 80.0
+cost = 50
+radius = 0.3
+friction_coefficient = 0.85
+suspension_stiffness = 5.0
