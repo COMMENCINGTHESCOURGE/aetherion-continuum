@@ -10,6 +10,7 @@ struct ConservationState {
     momentum_drift_x: atomic<i32>,
     momentum_drift_y: atomic<i32>,
     momentum_drift_z: atomic<i32>,
+    saturation_count: atomic<u32>, // increments when clamping occurs
 };
 
 struct DispatchMeta {
@@ -108,9 +109,18 @@ fn atomicAddSaturating(ptr: ptr<storage, atomic<i32>>, delta: i32) {
     loop {
         let old = atomicLoad(ptr);
         let sum = old + delta;
-        let clamped = clamp(sum, MIN_I, MAX_I);
+        // if sum exceeds bounds, clamp and increment saturation counter
+        var clamped = sum;
+        if (sum > MAX_I) {
+            clamped = MAX_I;
+            atomicAdd(&state.saturation_count, 1u);
+        } else if (sum < MIN_I) {
+            clamped = MIN_I;
+            atomicAdd(&state.saturation_count, 1u);
+        }
         let res = atomicCompareExchangeWeak(ptr, old, clamped);
         if (res.exchanged) { break; }
+        // otherwise, loop and retry (handle spurious failures)
     }
 }
 
