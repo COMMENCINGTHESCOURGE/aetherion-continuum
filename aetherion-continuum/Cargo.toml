@@ -1,0 +1,50 @@
+[package]
+name = "aetherion_continuum"
+version = "0.1.0"
+edition = "2021"
+description = "Field-Native, Conservation-Enforced Planetary Simulation Engine"
+license = "MIT"
+
+[lib]
+name = "aetherion_continuum"
+path = "src/lib.rs"
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Geometry and GIS
+geo = "0.28"
+rstar = "0.12"           # R-Tree for spatial queries
+osmpbf = "0.4"           # OSM PBF file parsing
+
+# GPU Computing (wgpu for WebGPU/Vulkan/Metal)
+wgpu = "0.19"
+bytemuck = "1.14"
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# Python bindings (optional)
+pyo3 = { version = "0.20", features = ["extension-module"], optional = true }
+
+[features]
+default = []
+python = ["pyo3"]
+
+[dev-dependencies]
+criterion = "0.5"
+mockall = "0.12"
+
+[[bench]]
+name = "field_tensor_bench"
+harness = false

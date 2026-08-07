@@ -1,1 +1,21 @@
-Nothing should be ignored based on the provided file changes, as they only include source/config files (.md files) and no build artifacts, dependencies, or temporary files.
+```
+# Rust-specific ignores
+target/
+Cargo.lock
+
+# Dependencies
+vendor/
+
+# Build artifacts
+**/*.rs.bk
+**/*.rlib
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+.env.*
+```
