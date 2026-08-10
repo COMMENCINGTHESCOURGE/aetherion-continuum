@@ -681,6 +681,7 @@ pub struct ShaderModules {
     pub sparse_stream: wgpu::ShaderModule,
     pub indirect_build: wgpu::ShaderModule,
     pub gpu_kompress: wgpu::ShaderModule,
+    pub omega_delta: wgpu::ShaderModule,  // Breakthrough Vector 2: Congruence-Gated Delta Kernel
 }
 
 pub async fn run() {
@@ -719,6 +720,7 @@ pub async fn run() {
     let sparse_stream_src = include_str!("../../core/sparse_stream.wgsl");
     let indirect_build_src = include_str!("../../core/indirect_build.wgsl");
     let gpu_kompress_src = include_str!("../../core/gpu_kompress.wgsl");
+    let omega_delta_src = include_str!("../../core/omega_delta_kernel.wgsl");  // Vector 2: Congruence-Gated Delta Kernel
 
     let shaders = ShaderModules {
         field_tensor: device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -740,6 +742,10 @@ pub async fn run() {
         gpu_kompress: device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("gpu_kompress"),
             source: wgpu::ShaderSource::Wgsl(gpu_kompress_src.into()),
+        }),
+        omega_delta: device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("omega_delta_kernel"),
+            source: wgpu::ShaderSource::Wgsl(omega_delta_src.into()),
         }),
     };
 
